@@ -1,0 +1,163 @@
+---
+title: "DATA 607 Assignment 1"
+author: "Warner Alexis"
+date: "2023-09-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+I select the SPI Rating for Football club Soccer data set. SPI defined as Soccer Power Index which is a rating system designed to rank  Soccer Clubs' overall strength. In addition, this is rating system that also use to designate the best team status based on their offensive and attacking strength. This data set contains 641 club teams ranking from 1(the best) to 641(the worst) with their  average offensive and  defensive rate per game and the team overall psi rating. 
+The link to retrieve the data is below: 
+<https://projects.fivethirtyeight.com/soccer-api/club/spi_global_rankings.csv.
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, warning=F}
+library(tidyverse)
+library(hrbrthemes)
+library(kableExtra)
+library(gt)
+club <- read.csv("https://projects.fivethirtyeight.com/soccer-api/club/spi_global_rankings.csv", sep = ',',
+                 stringsAsFactors = F)
+head(club,10)
+# Understanding the variables in the data set
+summary(club)
+```
+
+
+Lets remove the columns we don't need and rename some of them so it would be easier to understand the data set.
+
+We save the data in our Github and reload as instructed. 
+
+link: <https://raw.githubusercontent.com/joewarner89/CUNY-607/main/homeworks/Assignment%201/data/spi_global_rankings.csv>
+
+
+
+
+```{r}
+club <- read.csv("https://raw.githubusercontent.com/joewarner89/CUNY-607/main/homeworks/Assignment%201/data/spi_global_rankings.csv",
+              stringsAsFactors = F, header = T, sep = ',')
+
+club <- club %>% select(-contains("prev_rank"))
+head(club)
+club <- club %>% rename(club_team = name, 
+                        offensive_rate = off,
+                        defensive_rate = def 
+                        )
+club$power_class <- as.factor(ifelse(club$spi>= .01 & club$spi <= 29.99, 'Worst Rating Team',
+                                  ifelse(club$spi >= 30 & club$spi <= 39.99, 'Average Team',
+                                         ifelse(club$spi >= 40 & club$spi <= 75.99 , 'Good Team',
+                                                ifelse(club$spi >=76 & club$spi <= 82.99, 'Potential World Class Team',
+                                                       ifelse(club$spi >=83 & club$spi <= 100, 'World Class Team', 'Unknown'))))))
+head(club,10)
+```
+
+
+
+the variable spi determine the power class of the team. The higher the spi rate the better is the team. Manchester City rank # 1 because it has the highest spi 92.00
+
+
+
+The top ten team of 2022-2023 season :
+
+
+```{r, warning=FALSE}
+# select only top 20 teams based on ordered spi in the data set
+top_20 <- head(club,20)
+top_20 %>% 
+  ggplot( aes(x=club_team, y=spi) ) +
+  geom_bar(stat="identity", fill="#69b3a2") +
+  coord_flip() +
+  theme_ipsum() +
+  theme(
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    legend.position="none"
+  ) + 
+  xlab("Top 20 Teams Playing World Class Football") +   ggtitle("Highest Rated Soccer Clubs")+
+  ylab("Soccer Power Index(Best Team for 2022-2023 season)") 
+```
+
+Lets see the 20 teams with the lowest rating 
+
+
+
+
+```{r, warning=F}
+
+worst_20 <- tail(club,20)
+worst_20 %>% 
+  ggplot( aes(x=club_team, y=spi) ) +
+  geom_bar(stat="identity", fill="#69b3a2") +
+  coord_flip() +
+  theme_ipsum() +
+  theme(
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    legend.position="none"
+  ) + 
+  xlab("Top 20 Teams Playing Poorly") +   ggtitle("Lowest Rated Soccer Club")+
+  ylab("Soccer Power Index(Best Team for 2022-2023 season)") 
+
+
+```
+
+During the 2022-2023 season, a lot team improved their goal per game ratio and reduced conceding goals.SPI data set has the overall estimate for All top Soccer Clubs in the world. Lets explore the relationships between the variables. 
+
+
+```{r}
+# best offensive teams and defensive teams
+off <- 
+  club %>% arrange(desc(offensive_rate)) %>% head(10) %>% select(club_team, offensive_rate)
+  
+# Top 10 Offensive Team  
+gt(off) %>% 
+  tab_header(
+    title = "Best Offensive Team for the 2022-2023 Season",
+    subtitle = "Highest scoring Team for 2022-2023 Season "
+  ) 
+  
+# Best Defense in Europe
+deff <- 
+  club %>% arrange(defensive_rate) %>% head(10) %>% select(club_team, defensive_rate)
+
+  
+# Top 10 Defensive Team  
+gt(deff) %>% 
+  tab_header(
+    title = "Best Defensive Team for the 2022-2023 Season",
+    subtitle = "Highest scoring Team for 2022-2023 Season "
+  ) 
+  
+
+```
+
+Lets look at the relationship between these variables. 
+
+
+```{r}
+library(psych)
+# creating only numerical variables
+corr <- club %>% select(rank,offensive_rate,defensive_rate,spi) 
+corPlot(corr[,1:4], main = "Correlation of Team Statistic")
+corres <- cor(corr)
+corres <- round(corres, 2)
+# Transform the correlation table to data frame before using gt pckg
+gt(data.frame(round(corres,2))) %>% 
+  tab_header(
+    title = "Correlation Of All the Features for the 2022-2023 Season",
+    subtitle = " Relationship of All Soccer Statistics"
+  )  
+```
+
+
+
+## Conclusion: 
+What we learn from the data is that a team cannot win a tournament without a good defense and defensive rate  is highly correlated with the ranking number 1. Manchester City conceived few goals than any other teams in Europe. They have won UEFA Champion League, Premier League, FA Cup, Community Shield and EUFA Super Cup.  Soccer Power Index represents the team's overall strength over 100. SPI is a mixture of both defensive  and  offensive ratings. The team with the highest SPI would occupy the rank 1 as best team in the world. 

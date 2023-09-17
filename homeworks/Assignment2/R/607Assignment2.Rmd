@@ -1,0 +1,286 @@
+---
+title: "Data 607 Assignment – SQL and R"
+author: "Warner Alexis"
+date: "2023-09-16"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Set
+
+ I select a set of  data sets from Kaggle that cointain 4 tables necessary to do this project. The dataset is from both The Movie Database and IMDB. these files are located in this links <https://www.kaggle.com/datasets/rounakbanik/the-movies-dataset> 
+ 
+ Content
+This dataset consists of the following files:
+
+movies_metadata.csv: The main Movies Metadata file. Contains information on 45,000 movies featured in the Full MovieLens dataset. Features include posters, backdrops, budget, revenue, release dates, languages, production countries and companies.
+
+
+
+links.csv: The file that contains the TMDB and IMDB IDs of all the movies featured in the Full MovieLens dataset.
+
+ratings.csv: It has more than  100,000 ratings from more than 1000's users. 
+
+Cleaning the data is necessary to handle unsuported CSV parameters in Postgress. I Trim the data and work on long character format to Eliminate unwanted symbols and separate needed strings. 
+```{r cars}
+# load library needed  in R workspace 
+library(stringr)
+library(tidyverse)
+
+
+```
+
+
+
+```{r}
+data <- read.csv("movies_metadata.csv", header = T)
+head(data)
+```
+
+String manipulation needed before creating the database. Take a look at the  "" [{'id': 16, 'name': 'Animation'}, {'id': 35, 'name': 'Comedy'}, {'id': 10751, 'name': 'Family'}] ""  . 
+
+
+
+```{r}
+# renaming the variable and 
+movie_dataset <- data %>% mutate(genres= str_match(data$genres, "[A-Z][a-z]+"),
+                      production_companies = str_match(data$production_companies, "[A-Z][a-z]+ [A-Z][a-z]++"),
+                      production_countries = str_extract(data$production_countries, "[A-Z][a-z]+ [A-Z][a-z]++"),
+                      spoken_languages = str_match(data$spoken_languages, "[A-Z][a-z]+")
+                      ) %>%  distinct()
+head(movie_dataset)
+
+```
+
+This code is grey-out because it will overide the file in my computer. this is the next step before moving the file to PostGres PGAdmin 4 :
+write.table(movie_dataset,"movies_metadata_clean.txt", sep = "\t", row.names = F)
+
+
+Let run the Database libraries first
+
+```{r pressure}
+# database library 
+library(DBI)
+library(RODBC)
+library(odbc)
+library(RPostgres)
+
+```
+
+
+Let connect the database to the PostGres Database. It is important to make sure that the required ODBC driver must be identified and installed in order to access data from any database to another platform. 
+
+Best way to add the driver type or copy this in Windows Explore : <C:\Windows\System32\odbcad32.exe>
+
+```{r}
+# Create connection to db
+con <- dbConnect(odbc::odbc(), "PostgreSQL30", timeout = 10)
+dbListTables(con)
+
+```
+
+## Table Creation 
+The following syntax below is used to create the table in the database:
+CREATE TABLE public.movies_metadata
+(
+    id bigint NOT NULL,
+    imdb_id bigint NOT NULL,
+    adult boolean,
+    budget bigint,
+    genres character,
+    homepage character,
+    original_language character,
+    original_title character,
+    popularity bigint,
+    production_companies character,
+    production_countries character,
+    release_date date,
+    revenue numeric,
+    runtime bigint,
+    spoken_languages character,
+    status character,
+    title character,
+    video boolean,
+    vote_average numeric,
+    vote_count numeric,
+    PRIMARY KEY (id)
+);
+
+ALTER TABLE IF EXISTS public.movies_metadata
+    OWNER to postgres;
+
+
+
+
+create table movies_2 as select distinct 			id, 
+							imdb_id, 
+							genres, 
+							original_title , 
+							production_companies, 
+							release_date,
+							revenue, 
+							runtime, 
+							spoken_languages,
+							vote_average,
+							vote_count
+							from movies
+
+
+CREATE TABLE IF NOT EXISTS public.ratings
+(
+    user_id character varying COLLATE pg_catalog."default" NOT NULL,
+    movie_id character varying COLLATE pg_catalog."default",
+    ratings numeric(1000,0),
+    "timestamp" bigint,
+    CONSTRAINT ratings_pkey PRIMARY KEY (user_id)
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS public.ratings
+    OWNER to postgres;
+
+
+CREATE TABLE IF NOT EXISTS public.links
+(
+    movie_id character varying COLLATE pg_catalog."default",
+    imdb_id character varying COLLATE pg_catalog."default" NOT NULL,
+    tmdb_id character varying COLLATE pg_catalog."default",
+    CONSTRAINT links_pkey PRIMARY KEY (imdb_id)
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS public.links
+    OWNER to postgres;
+    
+CREATE TABLE IF NOT EXISTS public.ratings
+(
+    user_id character varying COLLATE pg_catalog."default" NOT NULL,
+    movie_id character varying COLLATE pg_catalog."default",
+    ratings numeric(1000,0),
+    "timestamp" bigint,
+    CONSTRAINT ratings_pkey PRIMARY KEY (user_id)
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS public.ratings
+    OWNER to postgres;
+    
+ REATE TABLE IF NOT EXISTS public.film
+(
+    id character varying COLLATE pg_catalog."default" NOT NULL,
+    imdb_id text COLLATE pg_catalog."default" NOT NULL,
+    genres character varying COLLATE pg_catalog."default",
+    original_title character varying COLLATE pg_catalog."default",
+    production_companies character varying COLLATE pg_catalog."default",
+    release_date character varying COLLATE pg_catalog."default",
+    revenue character varying COLLATE pg_catalog."default",
+    status character varying COLLATE pg_catalog."default",
+    vote_average character varying COLLATE pg_catalog."default",
+    vote_count character varying COLLATE pg_catalog."default",
+    CONSTRAINT film_pkey PRIMARY KEY (id),
+    CONSTRAINT film_fkey FOREIGN KEY (id)
+        REFERENCES public.ratings (user_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION
+        NOT VALID
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS public.film
+    OWNER to postgres;
+    
+    
+## Analysis
+
+I am going to read the data from my PostgreSQL Connection. I create 3 variables using the three tables i have in my database. It is very important to filter large table so R studio doesn't crash.  
+
+
+```{r}
+# Loading subsets of all film links and rating 
+film <-  dbGetQuery(con, "select * from public.film where revenue >= 100000000")
+str(film)
+
+links <- dbGetQuery(con, "select * from public.links")
+str(links)
+
+ratings <- dbGetQuery(con, "select * from public.ratings where ratings >= 5.0")
+str(ratings)
+
+```
+
+
+
+
+    
+```{r}
+summary(film)
+summary(ratings)
+summary(links)
+```
+I am going to rearrange the revenue so i can select the highest revue.    
+    
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(hrbrthemes)
+library(kableExtra)
+library(gt)
+# Join all table by their necessary primarykey. 
+top_movies <- film %>% inner_join(links) %>% distinct() %>% 
+  inner_join(ratings) %>% arrange(desc(revenue)) %>% 
+  select(id,imdb_id,genres,original_title,production_companies,release_date,
+         revenue,vote_average,tmdb_id,ratings) %>% distinct()
+
+head(top_movies)
+```
+
+```{r}
+# 20 highest 
+head(top_movies,20) %>% ggplot( aes(x=original_title, y=vote_average) ) +
+  geom_bar(stat="identity", fill="#69b3a2") +
+  coord_flip() +
+  theme_ipsum() +
+  theme(
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    legend.position="none"
+  ) + 
+  xlab("Top 20 Highest Earning Box Office Movies") +   ggtitle("IMDB Average Vote per User")+
+  ylab("Average IMDB fan votes")
+```
+
+
+```{r}
+top_movies %>% head(20) %>% ggplot( aes(x=genres, y=revenue)) +
+  geom_segment( aes(xend=genres, yend=0)) +
+  geom_point( size=4, color="orange") +
+  theme_bw() +
+  xlab("Top 20 Highest Earning Box Office Movies") +   ggtitle("Highest Earning Box Office movies by Genres")+
+  ylab("Highest Earning Movies by Genres")
+```
+
+
+
+```{r}
+# Box Office of All Time 
+All_time <- head(top_movies,10) %>% select(original_title, genres, revenue, release_date) %>%
+  gt() %>%
+  tab_header(
+    title = "Best Rated Movies of All Time",
+    subtitle = "Highest earning Movies of All Time "
+  ) 
+All_time
+```
+
+
+## Conclusion
+As Movie Fan, i can agree with the relevant information i discover in the data set. Avatar has always been the highest earning movies. Avengers makes quite some noise when it came out. We notice that action movies are by far the highest earning movies in the industry. There is still a big gap when comparing movie earnings by genres while only Animation movies made it to the top 10. 

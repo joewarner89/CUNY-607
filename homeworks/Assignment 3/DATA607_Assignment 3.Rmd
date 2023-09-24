@@ -1,0 +1,155 @@
+---
+title: "Week 3 Assignment"
+author: "Warner Alexis"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+
+Please deliver links to an R Markdown file (in GitHub and rpubs.com) with solutions to the problems below.  You may work in a small group, but please submit separately with names of all group participants in your submission.
+
+
+#1. Using the 173 majors listed in fivethirtyeight.com’s College Majors dataset [https://fivethirtyeight.com/features/the-economic-guide-to-picking-a-college-major/], provide code that identifies the majors that contain either "DATA" or "STATISTICS"
+
+
+
+```{r, echo=FALSE}
+library(tidyverse)
+library(stringr)
+library(gt)
+```
+
+I am going to provide code that identifies the majors that contain either "DATA" or "STATISTICS"
+
+```{r, major}
+# read the data in GithHub
+major <-  read.csv("https://raw.githubusercontent.com/fivethirtyeight/data/master/college-majors/majors-list.csv",
+                  stringsAsFactors = F, header = T)
+data_m <- major %>% filter(str_detect(Major, "DATA|STATISTICS"))
+
+gt_data <- gt(data_m)
+# Create two additional footnotes, using the
+# `columns` and `where` arguments of `data_cells()`
+gt_data |>
+  tab_header(
+    title = "The Data Science and Technology Majors",
+    subtitle = "The Only DATA and STATITICS Majors"
+  )
+
+# Show the gt Table
+gt_data
+
+
+
+```
+
+## 2 Write code that transforms the data below:
+[1] "bell pepper"  "bilberry"     "blackberry"   "blood orange"
+[5] "blueberry"    "cantaloupe"   "chili pepper" "cloudberry"  
+[9] "elderberry"   "lime"         "lychee"       "mulberry"    
+[13] "olive"        "salal berry"
+
+nto a format like this:
+c("bell pepper", "bilberry", "blackberry", "blood orange", "blueberry", "cantaloupe", "chili pepper", "cloudberry", "elderberry", "lime", "lychee", "mulberry", "olive", "salal berry")
+
+
+```{r}
+str <- c("bell pepper", "bilberry", "blackberry", "blood orange", "blueberry", "cantaloupe", "chili pepper", "cloudberry", "elderberry", "lime", "lychee", "mulberry", "olive", "salal berry")
+
+str
+```
+
+## 3 Describe, in words, what these expressions will match:
+(.)\1\1
+"(.)(.)\\2\\1"
+(..)\1
+"(.).\\1.\\1"
+"(.)(.)(.).*\\3\\2\\1"
+
+
+```{r}
+abc <- c("abc\1", "a\1", "abc","z\001\001","Z\1\1","b\1\1","aaaa","aabbbbbcccc","dd")
+v <- "(.)\1\1"
+v
+str_detect(abc,v)
+str_match(abc,v)
+```
+The backreference \1 (backslash one) references the first capturing group. \1 matches the exact same text that was matched by the first capturing group. The / before it is a literal character. 
+
+"(.)\1\1" will only match group strings group characters follow by \1 
+
+According to the R for Data Science book, The first way to use a capturing group is to refer back to it within a match with back reference: \1 refers to the match contained in the first parenthesis, \2 in the second parenthesis, and so on
+
+
+```{r}
+d <- "(.)(.)\\2\\1"
+str_detect(abc,d)
+str_match(abc,d)
+```
+"(.)(.)\\2\\1" would match any match contain in the second parenthesis which mean it will match any four of the same letters. Examples: "aaaa","aabbbbbcccc"--- It will only match a and b 
+
+```{r}
+j <- c("(..)\1")
+str_detect(abc,j)
+str_match(abc,j)
+```
+
+"(..)\1" will match any of the last two characters in a group string folowed by "\1". For Example: 
+"abc\1" -- bc will be selected 
+"acgdeftstwrhyg9.\1" --- g9 will be selected.
+
+```{r}
+c_l <- c("cdcacdabbb11","dgdgdfg","abacgwabda","trtrtrtr")
+p <- c("(.).\\1.\\1")
+str_detect(c_l,p)
+str_match(c_l,p)
+```
+
+
+"(.).\\1.\\1" will match string characters only where their first letter is identical after every other string characters. For example: 
+"cdcacdabbb11" will match "c" 
+"trtrtrtr" will match "t"
+
+
+```{r}
+ch <- c("bcdbcbdbcbd","cdcacdabbb11","dfdfhjdfh","spsdlkjspsd","000550050005")
+l <- c("(.)(.)(.).*\\3\\2\\1")
+str_detect(ch,l)
+str_match(ch,l)
+```
+
+"(.)(.)(.).*\\3\\2\\1" will only match characters that repeat three times in a string group. 
+For Examples : 
+ "dbcbdbcbd" will macth dbc
+ "spsdlkjsps"  will match "s"  "p"  "s" 
+ 
+ 
+ ## 4 Construct regular expressions to match words that:
+Start and end with the same character.
+Contain a repeated pair of letters (e.g. "church" contains "ch" repeated twice.)
+Contain one letter repeated in at least three places (e.g. "eleven" contains three "e"s.)
+
+
+```{r}
+words <-  c("alababa","cardiac", "chaotic","clementine","blueberry","guava","jujube" )
+str_view(words,  "^(.).*\\1$",match = T)
+```
+
+Contain a repeated pair of letters (e.g. "church" contains "ch" repeated twice.)
+
+```{r}
+v <- c("(.).*\\1.*\\1")
+str_detect(words,v)
+str_view(words, v, match = T)
+
+```
+Contain one letter repeated in at least three places (e.g. "eleven" contains three "e"s.)
+
+
+```{r}
+k <- ("(.).*\\1.*\\1")
+str_match(fruit,k)
+```
+

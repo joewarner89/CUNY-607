@@ -1,0 +1,80 @@
+---
+title: "DATA607 Assignment 5"
+author: "Warner Alexis"
+date: "2023-10-04"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Introduction
+We were given an data set of Arrival Airport delays between some of the big cities. The data set has a wide structure that needs some manipulation to transform it into long form. We load the csv file then rename the empty column name. We deleted all the empty row and reprocess the data inton a long structure. 
+
+
+
+
+```{r cars}
+# read data csv file 
+raw <- read.csv("https://raw.githubusercontent.com/joewarner89/CUNY-607/main/homeworks/Assignment%205/airport_data.csv", header = T, stringsAsFactors = F)
+# Delete all Empty rows
+raw <- raw %>% na.omit(raw)
+
+raw <- as.data.frame(raw)
+
+# rename row 
+
+raw <- raw %>% rename(Airlines = 1, Arrival_Status = 2)
+head(raw)
+```
+
+## Data Analysis
+The layout of this data set require data manipulation to transform this data set in the long form. 
+
+```{r pressure, echo=FALSE}
+# turn the wide data in long form 
+airline_data <- gather(raw, key = "City", value = "Arrival_Delays",Los.Angeles:Seattle)
+str(airline_data)
+head(airline_data)
+
+```
+
+We are going to replace the dot(.) in the City Column with a space. 
+
+
+```{r}
+airline_data$City <- str_replace(airline_data$City, "\\.", " ")
+head(airline_data)
+
+```
+
+
+We will fill the value of NA with the most recent value that above the empty strings. 
+```{r}
+final <- airline_data %>% mutate(Airlines = as.character(na_if(Airlines,""))) %>%  fill(Airlines,.direction = 'down')
+head(final)
+head(final)
+```
+
+
+## 
+
+```{r}
+final %>% group_by(Airlines,City,Arrival_Status) %>% summarise(Delay_total = sum(Arrival_Delays))
+air <- final %>% filter(City %in% c("Los Angeles","Seattle") )
+# Only 2 Airport
+air <- final %>% filter(City %in% c("Los Angeles","Seattle") )
+head(air)
+```
+
+
+```{r}
+ggplot(air, aes(x=City, y=Arrival_Delays, fill=Arrival_Status)) + 
+  geom_bar(stat='identity') +
+  theme_bw() 
+```
+

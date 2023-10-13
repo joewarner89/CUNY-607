@@ -1,0 +1,386 @@
+---
+title: "DATA607 Project 2"
+author: "Warner Alexis"
+date: "2023-10-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## National Science Foundation 
+
+This data set contain research information census  from Doctorate recipients by  historical major fields. This data requires some data manipulation to transform it from wide to long. What are the fields that have the highest numbers of doctorate recipients in 2022. We only selected all the major fields and excluded any field that summarize all the fields. 
+This is how the data look when enter our data platform. 
+
+![screenshot of the file preview](C:\Users\Warner_Beast\OneDrive\Documents\CUNY\DATA 607 - Data Acquisition and Management\Project 2\Screenshot.png)
+
+```{r cars}
+library(tidyverse)
+library(readxl)
+library(hrbrthemes)
+library(kableExtra)
+library(gt)
+
+raw <- read_csv("https://raw.githubusercontent.com/joewarner89/CUNY-607/main/Project%202/nsf24300-tab001-0033.csv",skip = 3)
+# read the data set 
+
+
+raw <- data.frame(raw)
+head(raw)
+```
+
+## Data Manipulation
+
+This data set comes with numerical columns which R Studio would have difficulty to tidy so We need to rename the variables. R studio put a X in front of all the number-like columns and dots and numbers for empty Column names. 
+For Examples: If a column name starts with 1992, R would represent that column like X1992. 
+
+
+```{r pressure}
+# deleted unnecessary rows 
+raw <- raw[-c(1),]
+# Rename the variable so there are no numerical variable in the raw data 
+raw <- raw %>% rename(Doctorate_Field = 1,
+                y1992 = 2,
+                y1992_ = 3,
+                y1997 = 4,
+                y1997_ = 5,
+                y2002 = 6,
+                y2002_ = 7,
+                y2007 = 8,
+                y2007_ = 9,
+                y2012 = 10,
+                y2012_ = 11,
+                y2017 = 12,
+                y2017_ = 13,
+                y2022 = 14,
+                y2022_ = 15)
+
+
+
+# Transforming the data set 
+head(raw)
+```
+
+Tidy package is useful for grouping certain rows and turn them as column. This package simplifies the process of transforming a data set from making them wide or long or spreading the rows into columns. It is essential to creating year, numbers and percent.
+
+
+```{r}
+
+# Creating pivot pramaters var1 and var2
+var1 <- c("y1992","y1997","y2002","y2007","y2012","y2017","y2022")
+var2 <- c("y1992_","y1997_","y2002_","y2007_","y2012_","y2017_","y2022_")
+
+# Creating 2 data sets to fully transform the problem
+# fist data set transform data for year that match all the numbers
+
+rawdata <- pivot_longer(
+  data = raw,
+  cols = all_of(var1),
+  names_to = "year",
+  values_to = "numbers"
+  
+)
+
+# 2nd data set transform data for year that match all the percentage
+raw_data1 <- pivot_longer(
+  data = rawdata,
+  cols = all_of(var2),
+  names_to = "year_",
+  values_to = "percent"
+)
+raw_data1$year <- str_extract(raw_data1$year,"\\d+")
+raw_data1$year_ <- str_extract(raw_data1$year_,"\\d+")
+
+# creating data with the correct alignment
+data <- raw_data1 %>% filter(year == year_) %>% select(Doctorate_Field,year,numbers,percent)
+data$numbers <- as.numeric(data$numbers)
+data$percent <- as.double(data$percent)
+
+#Subset the data to get all major in 2022
+
+final <- data %>% filter(Doctorate_Field!="All fields",
+                year == '2022' ) %>% arrange(desc(numbers) )
+
+head(final)
+```
+
+
+## Data Analysis
+
+We want to determine what Doctorate Program have the Highest numbers of recipients in 2022. this questions can help us understand in the near future, what fields that is going to have a higher employment rate. 
+
+```{r, warning=FALSE}
+# Number of PhD Graduates 
+final %>% head(10) %>% filter(Doctorate_Field!="Other") %>%
+  ggplot( aes(x=Doctorate_Field, y=numbers) ) +
+  geom_bar(stat="identity", fill="#69b3a2") +
+  coord_flip() +
+  theme_ipsum() +
+  theme(
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    legend.position="none"
+  ) + 
+  xlab("Top 10 Doctorate Major in 2022") +   ggtitle("Highest Doctorate Receipients")+
+  ylab("Number of Doctorate Recipients by Major in 2022") 
+
+# Increase percentage of Graduate compare to previous year in 2022
+
+final %>% head(10) %>% filter(Doctorate_Field!="Other") %>%
+  ggplot( aes(x=Doctorate_Field, y=percent) ) +
+  geom_bar(stat="identity", fill="#69b3a2") +
+  coord_flip() +
+  theme_ipsum() +
+  theme(
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    legend.position="none"
+  ) + 
+  xlab("Top 10 Doctorate Majors in 2022") +   ggtitle("Highest Doctorate Recipients Graduate prior previous year")+
+  ylab("Percentage of Doctorate Recipients by Major in 2022") 
+
+
+```
+
+What we learn form this data from the National Science Foundation is that Teaching fields major and Civil Engineering have the highest number of graduates in 2022 and seem that the numbers of graduates increase every year. This suggests that these majors would be very important in near future. United of America lays out its plan for national infrastructure. According to New York Times, Biden Details $2 Trillion Plan to Rebuild Infrastructure and Reshape the Economy. The president plan is to fix 20000 miles of roads and 10000 bridges. Civil engineering and  Teaching Fields will be essential in the upcoming infrastructure project.
+
+References
+https://ncses.nsf.gov/pubs/nsf24300/table/1-3
+
+
+
+## Domestic Tourism
+According to United Nation World Tourism (UNWTO), Tourism is a social, cultural and economic phenomenon which entails the movement of people to countries or places outside their usual environment for personal or business/professional purposes. These people are called visitors (which may be either tourists or excursionists; residents or non-residents) and tourism has to do with their activities, some of which involve tourism expenditure. 
+This data sets has information about how many visitors travel per country. 
+
+This is how the data look:
+
+![screenshot of the file preview](C:\Users\Warner_Beast\OneDrive\Documents\CUNY\DATA 607 - Data Acquisition and Management\Project 2\tourist_screen.png)
+
+
+
+
+
+```{r}
+# load the data from Github
+tourist <- read.csv("https://raw.githubusercontent.com/joewarner89/CUNY-607/main/Project%202/OECD%20-%20Tourism%20data.csv", stringsAsFactors = F, skip = 1)
+
+# Delete Empty row
+tourist$X <- NULL
+# Delete unwanted rows at the bottom of the files
+tourist <- tourist[-c(208:213),]
+head(tourist)
+```
+
+## Data Manipulation
+This data set has a lot of empty spaces. We are going to fill out with the country column with the respective country every observation belong to then creating two data set to create the year and visitors column. both newly created columns can be constructed using `gather()` or `pivot_long()` depending on how you select your parameters
+
+```{r}
+
+# fill the values in country so the right country aligned with his population visitors
+
+tourist <- tourist  %>% mutate(Country = as.character(na_if(Country,""))) %>% fill(Country,.direction = 'down')
+
+var_t <- c("X2008","X2009","X2010","X2011","X2012","X2013"
+                   ,"X2014","X2015","X2016","X2017","X2018",
+                   "X2019","X2020","X2021")
+
+# creating new variables.
+
+prep <- pivot_longer(
+  data = tourist,
+  cols = all_of(var_t),
+  names_to = "year",
+  values_to = "visitors"
+  
+)
+
+# replace the missing value with o 
+prep <- prep %>% 
+  mutate(Country = str_replace(Country, "T�rkiye","Turkey"))
+prep$visitors[prep$visitors == '..'] <- 0
+prep$visitors <- as.numeric(gsub(",", "", prep$visitors)) 
+
+# re-transform the dataset so 
+prep2 <- spread(prep,
+       key = "Variable",
+       value = "visitors")
+prep2$year <- str_extract(prep2$year,"\\d+")
+prep2$V1 <- NULL
+
+### Rename the variables 
+tourist_final <- prep2 %>% rename(Hotel_Establishments = 3,
+                                  Collective_Establishments = 4,
+                                  Overnights_visitors = 5,
+                                  Private_Accomodation = 6,
+                                  SameDay_Accomodation = 7,
+                                  Nights_Accomodations = 8,
+                                  Total_Domestic_Trips = 9)
+
+
+
+tourist_final[is.na(tourist_final)] = 0
+tourist_final$Country[tourist_final$Country == 'T<fc>rkiye'] <- 'Turkey'
+
+# look at tourism in 2021
+tourist21 <- tourist_final %>% filter(year == 2021)
+finaldata <- tourist21 %>% arrange(desc(Hotel_Establishments)) %>% filter(Hotel_Establishments != 0) %>%
+  select(Country,year,Hotel_Establishments) %>% head(10)
+head(finaldata)
+
+
+```
+Now We are going to look at countries that have a lot visitor booking Hotels. 
+
+```{r}
+tour_tbl <- gt(finaldata)
+
+tour_tbl <- 
+  tour_tbl |>
+  tab_header(
+    title = md("**Top 10 Touristic Country in the World**"),
+    subtitle = md("countries with Highest Hotel Accomodation by Tourists")
+  )
+tour_tbl
+
+finaldata %>% ggplot( aes(x=Country, y=Hotel_Establishments)) +
+  geom_segment( aes(xend=Country, yend=0)) +
+  geom_point( size=4, color="orange") + scale_y_continuous(trans='log2') +
+  theme_bw() +
+  xlab("Top 10 Touristic Countries in the World") +   ggtitle("Top 10 Touristic Countries By Hotel Establishments in 2021")+
+  ylab("Number of visitors by Hotel Establishments in 2021")
+```
+
+More people have traveled to USA than any other countries. Big Cities in the USA have a lot great establishments such as Hotels, Private Properties and so on. Tourism has a great effect on any country economy. The top 10 countries revealed in the data sets has the most decorative hotels and can the one of the best accommodations in the World.USA and France are considered one of the most popular place to visit.  
+ 
+ 
+
+ 
+ 
+## School Performances
+
+According to the city of Chicago, This data set shows all school level performance data used to create CPS School Report Cards for the 2011-2012 school year. Metrics are described as follows (also available for download at http://bit.ly/uhbzah): NDA indicates "No Data Available." 
+
+We are going to transform the data set so we can look into which high school perform well and how impacted is the teacher involvement in the school year. 
+
+
+**First look of the data set**
+![Preview of the data set](C:\Users\Warner_Beast\OneDrive\Documents\CUNY\DATA 607 - Data Acquisition and Management\Project 2\schoolscreen.png)
+
+```{r}
+raw <- read.csv("https://raw.githubusercontent.com/joewarner89/CUNY-607/main/Project%202/schools_by_performance_level.csv", stringsAsFactors = F,sep = ",")
+head(raw)
+```
+
+
+
+
+
+```{r}
+#subseting the data set
+# We want only high school that their grade benchmark 
+raw <- raw %>% select(School.ID:Phone.Number,Teachers.Icon,Teachers.Score,
+                      ISAT.Exceeding.Math..:X10th.Grade.PLAN..2010.) %>% 
+  filter(Elementary..Middle..or.High.School == "HS")
+# Rename some variable names
+raw2 <- raw %>%  select(1:19) %>%    rename(School_id = 1,
+                      School = 2,
+                      School_Category = 3,
+                      Street_Address = 4,
+                      Phone_Number = 5,
+                      Teachers = 6,
+                      Teachers_Score = 7,
+                      
+                      Algebra = Students.Taking..Algebra..,
+                      Algebra_Benchmark = Students.Taking..Algebra..,
+                      Explore_9th_Grade_2009 = X9th.Grade.EXPLORE..2009.,
+                      Explore_9th_Grade_2010 = X9th.Grade.EXPLORE..2010.,
+                      Plan_10th_Grade_2009 = X10th.Grade.PLAN..2009.,
+                      Plan_10th_Grade_2010 = X10th.Grade.PLAN..2010.) 
+
+# reselect important rows
+raw2 <- raw2 %>% select (1:7,16:19)
+
+
+# Replace String with Another Stirng
+raw2$Teachers[raw2$Teachers == 'NDA'] <- 'NA'
+raw2$Teachers_Score[raw2$Teachers_Score == 'NDA'] <- '0'
+raw2$Explore_9th_Grade_2009[raw2$Explore_9th_Grade_2009 == 'NDA'] <- 0
+raw2$Explore_9th_Grade_2010[raw2$Explore_9th_Grade_2010 == 'NDA'] <- 0
+raw2$Plan_10th_Grade_2009[raw2$Plan_10th_Grade_2009 == 'NDA'] <- 0
+raw2$Plan_10th_Grade_2010[raw2$Plan_10th_Grade_2010 == 'NDA'] <- 0
+head(raw2)
+```
+
+
+
+## Data Manipulation
+we are going transform the data set so we can create new variables for Performance Column, along with survey data fields.
+
+```{r}
+
+# Transforming the data set to Long using the 
+# performance benchmark for all teachers
+
+temp <- pivot_longer(
+  data = raw2,
+  cols = Teachers,
+  names_to = "Performance",
+  values_to = "Teaching_Performance"
+  
+)
+
+## Spred the performace acroos different columns 
+temp_prep <- spread(temp, key = "Teaching_Performance",value = "Teachers_Score")
+temp_prep$Not_Recorded <- temp_prep$`NA`
+temp_prep$`NA` <- NULL
+
+# Replace All na with 0 
+temp_prep$Average[temp_prep$Average == NA] <- "0"
+temp_prep <-  temp_prep %>% mutate_at(c('Average','Strong','Very Strong','Weak','Not_Recorded',
+                                 'Explore_9th_Grade_2009','Explore_9th_Grade_2010','Plan_10th_Grade_2009',
+                                 'Plan_10th_Grade_2010'), as.numeric)
+
+temp_prep$`Very Strong`[temp_prep$`Very Strong` == NA] <- 0
+head(temp_prep)
+
+# High School that have the highest average  of Student performing well in their test 
+school <- temp_prep %>% arrange(desc(Explore_9th_Grade_2009)) %>% select(2,3,Performance,Explore_9th_Grade_2009:Plan_10th_Grade_2010,Average:Not_Recorded ) %>%
+  head(10)
+school <- school %>% replace(is.na(.), 0)
+head(school)
+```
+
+
+Let look at the schools that performed well in 2009 because of their teacher performances. We are going to check the top school in Niche.com to have an idea why City of Chicago survey range this particular school as one to excel in taking state exam. 
+
+```{r, warning=FALSE}
+# the choosen graph
+school %>%   ggplot(aes(x = School, y = Explore_9th_Grade_2009)) +
+  geom_col() +
+  facet_grid(~ Performance) + 
+  coord_flip() +
+  ylim(c(0, 90)) +
+  geom_text(aes(label = round(Explore_9th_Grade_2009, 1)), hjust = -.1) + 
+  labs(x = "Top 10 High School In Chigago Distrist", y = "Highest Test Score Benchmark for year 2009")
+
+
+```
+
+
+
+According to Nice.com, Northside College Preparatory High School is a top rated, public, magnet school located in CHICAGO, IL. It has 1,027 students in grades 9-12 with a student-teacher ratio of 16 to 1. According to state test scores, 94% of students are at least proficient in math and 95% in reading. These Schools has performing since 2009 to present day and the involvements of teachers and parents have been one of the main reasons they do well academically. 
+The picture below shows a comparison of some of the best High School revealed in the top 10 list.
+![Comparison of Best Performing School In the District of Chicago ](C:\Users\Warner_Beast\OneDrive\Documents\CUNY\DATA 607 - Data Acquisition and Management\Project 2\Screen Shot 2023-10-12 at 4.37.20 PM.png)
+
+
+## References
+Schools, C. P. (2018, September 14). NNW -all schools by Performance Level + AYP: City of chicago: Data Portal. Chicago Data Portal. https://data.cityofchicago.org/Education/NNW-all-schools-by-performance-level-AYP/wefw-pbqz 
+
+Senior, Freshman, &amp; Junior. (2021a, December 31). Northside College Preparatory High School in Chicago, IL. Niche. https://www.niche.com/k12/northside-college-preparatory-high-school-chicago-il/ 
+
+Kelly Kang, J. F. (n.d.). Data tables. NSF. https://ncses.nsf.gov/pubs/nsf24300/table/1-3 
+
+Tankersley, J. (2021, March 31). Biden details $2 trillion plan to rebuild infrastructure and reshape the economy. The New York Times. https://www.nytimes.com/2021/03/31/business/economy/biden-infrastructure-plan.html#:~:text=677-,Biden%20Details%20%242%20Trillion%20Plan%20to%20Rebuild%20Infrastructure%20and%20Reshape,inequities%20and%20raising%20corporate%20taxes. 

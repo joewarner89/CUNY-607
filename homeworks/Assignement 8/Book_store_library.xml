@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<book_store>
+  <books>
+    <Book_name>Data Science for Business</Book_name>
+    <Author>Tom Fawcett</Author>
+    <Line>1</Line>
+    <ISB_Number>9781449374280</ISB_Number>
+    <Page_Counts>414</Page_Counts>
+    <Published>08/27/2023</Published>
+  </books>
+  <books>
+    <Book_name>Data Science for Business</Book_name>
+    <Author>Foster Provost</Author>
+    <Line>2</Line>
+    <ISB_Number>9781449374280</ISB_Number>
+    <Page_Counts>414</Page_Counts>
+    <Published>08/27/2023</Published>
+  </books>
+  <books>
+    <Book_name>The Miseducation of the Negro</Book_name>
+    <Author>Carter Godwin Woodson</Author>
+    <Line>1</Line>
+    <ISB_Number>9781564110411</ISB_Number>
+    <Page_Counts>215</Page_Counts>
+    <Published>01/01/1992</Published>
+  </books>
+  <books>
+    <Book_name>The Miseducation of the Negro</Book_name>
+    <Author>H. Khalif Khalifah</Author>
+    <Line>2</Line>
+    <ISB_Number>9781564110411</ISB_Number>
+    <Page_Counts>215</Page_Counts>
+    <Published>01/01/1992</Published>
+  </books>
+  <books>
+    <Book_name>Twilights</Book_name>
+    <Author>Stephenie Meyer</Author>
+    <Line>1</Line>
+    <ISB_Number>9780316007443</ISB_Number>
+    <Page_Counts>544</Page_Counts>
+    <Published>08/18/2007</Published>
+  </books>
+  <views/>
+</book_store>

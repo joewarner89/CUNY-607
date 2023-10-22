@@ -1,0 +1,42 @@
+[
+  {
+    "Book_name": "Data Science for Business",
+    "Author": "Tom Fawcett",
+    "Line": 1,
+    "ISB_Number": "9781449374280",
+    "Page_Counts": 414,
+    "Published": "08/27/2023"
+  },
+  {
+    "Book_name": "Data Science for Business",
+    "Author": "Foster Provost",
+    "Line": 2,
+    "ISB_Number": "9781449374280",
+    "Page_Counts": 414,
+    "Published": "08/27/2023"
+  },
+  {
+    "Book_name": "The Miseducation of the Negro",
+    "Author": "Carter Godwin Woodson",
+    "Line": 1,
+    "ISB_Number": "9781564110411",
+    "Page_Counts": 215,
+    "Published": "01/01/1992"
+  },
+  {
+    "Book_name": "The Miseducation of the Negro",
+    "Author": "H. Khalif Khalifah",
+    "Line": 2,
+    "ISB_Number": "9781564110411",
+    "Page_Counts": 215,
+    "Published": "01/01/1992"
+  },
+  {
+    "Book_name": "Twilights",
+    "Author": "Stephenie Meyer",
+    "Line": 1,
+    "ISB_Number": "9780316007443",
+    "Page_Counts": 544,
+    "Published": "08/18/2007"
+  }
+]

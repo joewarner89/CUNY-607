@@ -1,0 +1,64 @@
+---
+title: "Data 607 Web APIs"
+author: "Warner Alexis"
+date: "2023-11-05"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## New York Times Books API
+I choose the book api from New York Times that contains information 15 books. 
+First we use a API Tester to see all the revelant information about the API and what I can get a view where to get the information I need. I need to contruct a table from API available information. 
+
+![Thi is API tester from Chrome](C:\Users\Warner_Beast\OneDrive\Documents\CUNY\DATA 607 - Data Acquisition and Management\HomeWork\Assignment 9\Screenshot.png)
+
+
+
+
+```{r cars}
+library(jsonlite)
+library(tidyverse)
+library(lares)
+library(ggplot2)
+library(httr)
+library(ggbump)
+# Read the api links 
+api_url <- "https://api.nytimes.com/svc/books/v3/lists/current/hardcover-fiction.json?api-key=QFqxixdrjHITcbZo0Q4gU1pHEUQSWu11"
+
+# turn the data into Json Format
+data <- fromJSON(api_url)
+
+# based on the API test, select books from the jSon format 
+books  <- as.data.frame( data$results$books)
+```
+
+Lets investigate the Book data set. 
+
+```{r pressure}
+str(books)
+# Show preview some columns 
+head(books) %>% select(6:8,11)
+```
+Lets look at the books that spend more times in the list for highest ranking books
+
+
+```{r}
+ggplot(books, aes(x = title, y = weeks_on_list)) +
+  geom_segment(aes(x = title, xend = title, y = 0, yend = weeks_on_list),
+               color = "gray", lwd = 1) +
+  geom_point(size = 7.5, pch = 21, bg = 4, col = 1) +
+  geom_text(aes(label = weeks_on_list), color = "white", size = 3) +
+  #scale_x_discrete(labels = paste0("G_", 1:10)) +
+  coord_flip() +
+  theme_minimal()
+```
+
+
+
+## Conclusion
+This graph shows a distribution of all the books that spend weeks in the ranking chart. I access the API from NYTimes Developer account and turn the json data into a R Data Frame and run analysis on it.

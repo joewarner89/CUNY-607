@@ -1,0 +1,302 @@
+---
+title: "DATA 607 Sentiment Analysis"
+author: "Warner Alexis"
+date: "2023-11-12"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Sentiment Analysis
+
+In this exercise, we will provide some the of code written in chapter 2 to do our analysis. We will load a new corpus  based on all the books written by 'Luther, Martin'.
+
+```{r cars,echo=TRUE}
+# load package 
+library(janeaustenr)
+library(gutenbergr)
+library(dplyr)
+library(tidytext)
+library(scales)
+library(broom)
+library(tm)
+library(quanteda)
+library(stringr)
+library(tidyverse)
+
+```
+
+## Example of Codes in Chapter 2
+
+Sentiment analysis provides a way to get understand sentiment expressed in text document. we learn how to tidy a text and create different lexicons.
+
+
+```{r pressure, echo=FALSE}
+# loading the Austen book 
+
+
+tidy_books <- austen_books() %>%
+  group_by(book) %>%
+  mutate(
+    linenumber = row_number(),
+    chapter = cumsum(str_detect(text, 
+                                regex("^chapter [\\divxlc]", 
+                                      ignore_case = TRUE)))) %>%
+  ungroup() %>%
+  unnest_tokens(word, text)
+
+nrc_joy <- get_sentiments("nrc") %>% 
+  filter(sentiment == "joy")
+
+tidy_books %>%
+  filter(book == "Emma") %>%
+  inner_join(nrc_joy) %>%
+  count(word, sort = TRUE)
+
+```
+
+```{r}
+
+# creat the the sentiment dataset usinh inner_join 
+jane_austen_sentiment <- tidy_books %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(book, index = linenumber %/% 80, sentiment) %>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>% 
+  mutate(sentiment = positive - negative)
+
+# plot the result
+ggplot(jane_austen_sentiment, aes(index, sentiment, fill = book)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~book, ncol = 2, scales = "free_x")
+pride_prejudice <- tidy_books %>% 
+  filter(book == "Pride & Prejudice")
+
+
+
+afinn <- pride_prejudice %>% 
+  inner_join(get_sentiments("afinn")) %>% 
+  group_by(index = linenumber %/% 80) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  mutate(method = "AFINN")
+
+bing_and_nrc <- bind_rows(
+  pride_prejudice %>% 
+    inner_join(get_sentiments("bing")) %>%
+    mutate(method = "Bing et al."),
+  pride_prejudice %>% 
+    inner_join(get_sentiments("nrc") %>% 
+                 filter(sentiment %in% c("positive", 
+                                         "negative"))
+    ) %>%
+    mutate(method = "NRC")) %>%
+  count(method, index = linenumber %/% 80, sentiment) %>%
+  pivot_wider(names_from = sentiment,
+              values_from = n,
+              values_fill = 0) %>% 
+  mutate(sentiment = positive - negative)
+
+bind_rows(afinn, 
+          bing_and_nrc) %>%
+  ggplot(aes(index, sentiment, fill = method)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~method, ncol = 1, scales = "free_y")
+
+get_sentiments("nrc") %>% 
+  filter(sentiment %in% c("positive", "negative")) %>% 
+  count(sentiment)
+get_sentiments("bing") %>% 
+  count(sentiment)
+
+
+
+bing_word_counts <- tidy_books %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  ungroup()
+
+
+
+
+
+
+bing_word_counts %>%
+  group_by(sentiment) %>%
+  slice_max(n, n = 10) %>% 
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(n, word, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(x = "Contribution to sentiment",
+       y = NULL)
+
+
+library(wordcloud)
+
+tidy_books %>%
+  anti_join(stop_words) %>%
+  count(word) %>%
+  with(wordcloud(word, n, max.words = 100))
+
+library(reshape2)
+
+tidy_books %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud(colors = c("gray20", "gray80"),
+                   max.words = 100)
+
+p_and_p_sentences <- tibble(text = prideprejudice) %>% 
+  unnest_tokens(sentence, text, token = "sentences")
+
+p_and_p_sentences$sentence[2]
+
+austen_chapters <- austen_books() %>%
+  group_by(book) %>%
+  unnest_tokens(chapter, text, token = "regex", 
+                pattern = "Chapter|CHAPTER [\\dIVXLC]") %>%
+  ungroup()
+
+austen_chapters %>% 
+  group_by(book) %>% 
+  summarise(chapters = n())
+bingnegative <- get_sentiments("bing") %>% 
+  filter(sentiment == "negative")
+
+wordcounts <- tidy_books %>%
+  group_by(book, chapter) %>%
+  summarize(words = n())
+
+tidy_books %>%
+  semi_join(bingnegative) %>%
+  group_by(book, chapter) %>%
+  summarize(negativewords = n()) %>%
+  left_join(wordcounts, by = c("book", "chapter")) %>%
+  mutate(ratio = negativewords/words) %>%
+  filter(chapter != 0) %>%
+  slice_max(ratio, n = 1) %>% 
+  ungroup()
+
+```
+
+We are going to use new corpus from package Gutenberg using author  'Luther, Martin'.  We modify the data set so we can run sentiment analysis and dicover important words in these particular books
+
+
+
+
+```{r}
+# load tthe book  
+library(gutenbergr)
+# load the new corpus 
+Martin_books <- gutenberg_works(author == 'Luther, Martin')
+head(Martin_books)
+
+tidy_martin <- Martin_books %>% 
+  gutenberg_download(meta_fields = 'title') %>%
+  group_by(gutenberg_id) %>%
+  mutate(linenumber = row_number()) %>%
+  ungroup() %>%
+  unnest_tokens(word, text)
+
+
+martin_sent <- tidy_martin %>%
+  
+  inner_join(get_sentiments('bing'), by = 'word') %>%
+  count(title, index = linenumber %/% 80, sentiment) %>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
+  mutate(sentiment = positive - negative)
+head(martin_sent)
+
+
+get_sentiments("nrc") %>% 
+  filter(sentiment %in% c("positive", "negative")) %>% 
+  count(sentiment)
+
+get_sentiments("bing") %>% 
+  count(sentiment)
+
+martin_word_counts <- tidy_martin %>% inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  ungroup()
+
+```
+```{r}
+martin_word_counts  %>%
+  group_by(sentiment) %>%
+  slice_max(n, n = 10) %>% 
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(n, word, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(x = "Contribution to sentiment",
+       y = NULL)
+
+
+tidy_martin%>%
+  anti_join(stop_words) %>%
+  count(word) %>%
+  with(wordcloud(word, n, max.words = 100))
+
+library(reshape2)
+
+tidy_martin %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud(colors = c("blue", "green"),
+                   max.words = 100)
+
+```
+
+```{r}
+martin_words <- Martin_books %>% 
+  gutenberg_download(meta_fields = 'title') %>%
+  group_by(gutenberg_id) %>%
+  ungroup() %>%
+  unnest_tokens(word, text) %>% rename(book = title) %>%
+  count(book, word, sort = T)
+
+total_words <- martin_words %>% 
+  group_by(book) %>% 
+  summarize(total = sum(n))
+martin_words <- left_join(martin_words, total_words)
+head(martin_words)
+
+book_tf_idf <- martin_words %>%
+  bind_tf_idf(word, book, n)
+book_tf_idf %>%
+  select(-total) %>%
+  arrange(desc(tf_idf))
+
+head(book_tf_idf)
+library(forcats)
+
+
+```
+```{r,fig.show='hide'}
+book_tf_idf %>%
+  group_by(book) %>%
+  slice_max(tf_idf, n = 15) %>%
+  ungroup() %>%
+  ggplot(aes(tf_idf, fct_reorder(word, tf_idf), fill = book)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~book, ncol = 2, scales = "free") +
+  labs(x = "tf-idf", y = NULL)
+
+```
+
+
+![Most Important words](C:\Users\Warner_Beast\OneDrive\Documents\CUNY\DATA 607 - Data Acquisition and Management\HomeWork\Assignment 10\00001a.png)
+
+
+These are the most common words in the novels written by Martin Luther. as we notice there are a lot of character names that are important for each corpus  text with his novels. 
+
+## References 
+
+Robinson, J. S. and D. (n.d.). 3 analyzing word and document frequency: Tf-IDF: Text mining with R. A Tidy Approach. https://www.tidytextmining.com/tfidf 

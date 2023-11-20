@@ -1,0 +1,211 @@
+---
+title: "DATA 607 - Document Classification"
+author: "Warner Alexis"
+date: "2023-11-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Document Classification
+
+We are provided with a list of corpus  that contains Spam and Ham emails files `(https://spamassassin.apache.org/old/publiccorpus/)` and instructions on how to download. we prefer to use Studio systematic files download so everyone can run the script. We are going to use the tm package which contains function NLP functions. 
+
+We are going to implement the following the steps: 
+1. Download and Load the data
+2. Transform the data into Corpus
+3. Model Development
+3. Prediction
+
+We use this code to download the files and load in R. 
+
+#Loading and Downloading the files
+url_ham <- "https://spamassassin.apache.org/old/publiccorpus/20021010_easy_ham.tar.bz2"
+url_spam <- "https://spamassassin.apache.org/old/publiccorpus/20021010_spam.tar.bz2"
+
+
+download.file(url_ham, destfile = "ham.tar.bz2")
+download.file(url_spam, destfile = "spam.tar.bz2")
+untar("spam.tar.bz2", exdir = "spam")
+untar("ham.tar.bz2", exdir = "ham")
+
+This will stop our Rm markdown after running once and freeze. 
+
+
+```{r cars}
+# Download and Load the data 
+library(tm)
+library(caret)
+library(e1071)
+library(tidyverse)
+library(wordcloud)
+library(naivebayes)
+library(tm)
+library(SnowballC)
+library(caret)
+library(gbm)
+library(e1071)
+
+#Loading and Downloading the files
+
+
+# Read the data in the folder we save them 
+spam_path <- "spam/"
+ham_path <- "ham/easy_ham/"
+spam_path <- spam_path[which(spam_path!="cmds")]
+ham_path <- ham_path[which(ham_path!="cmds")]
+```
+
+## Transform the data into Corpus
+The data analysis step involves creating a corpus and tidy the data into a data frane so the algorithm can run it. 
+We are going to bind both ham and spam corpus and turn them into a data set. It is  very important to create a test set and training set. 
+```{r pressure, warning=FALSE}
+# Creating the text Corpus
+spam <- Corpus(DirSource(spam_path))
+ham <- Corpus(DirSource(ham_path))
+
+# #Lets see what inside each email corpus 
+meta(spam[[1]])
+meta(ham[[1]])
+
+# create function to remove punctuation , common stop words , covert text to lower
+## remove any unnecessary character with numbers 
+spam_tidy <- function(doc){
+  doc <- tm_map(doc, content_transformer(tolower))
+  doc <- tm_map(doc, content_transformer(PlainTextDocument))
+  doc <- tm_map(doc, content_transformer(removePunctuation))
+  doc <- tm_map(doc, content_transformer(tolower))
+  doc <- tm_map(doc,content_transformer(removeNumbers))
+  doc <- tm_map(doc, content_transformer(stemDocument),  language = 'english')
+  #doc <- tm_map(doc, removeWords, c('receiv', stopwords('english')))
+  doc <- tm_map(doc, removeWords, c('spamassassin', stopwords('english')))
+  doc <- tm_map(doc, stripWhitespace)
+  
+  return(doc)
+  
+}
+
+# use function for both spam and ham 
+spam_corpus <- spam_tidy(spam)
+spam_corpus
+easy_ham_corpus <- spam_tidy(ham)
+easy_ham_corpus
+
+# create the ham and spam corpus 
+ham_or_spam_corpus <- c(easy_ham_corpus, spam_corpus)
+tdm <- DocumentTermMatrix(ham_or_spam_corpus)
+tdm
+inspect(tdm)
+
+# see top 10 words in both spam ham combine 
+# Summary Statistics
+
+freq <- tdm %>% as.matrix() %>% colSums()
+length(freq)  
+freq_ord <- freq %>% order(decreasing = TRUE)
+par(las=1)
+#This will create a bar plot of the top 10 words in the spam Corpus
+barplot(freq[freq_ord[1:10]], horiz = TRUE, col=terrain.colors(10), cex.names=0.7)
+# Let see combinaison of  100 words that appears in both ham and spam 
+wordcloud(ham_or_spam_corpus, max.words = 100, random.order = FALSE, rot.per=0.15, min.freq=5, colors = brewer.pal(8, "Dark2"))
+```
+
+## Model Development
+We are going to transform the Document Term Matrix in a data frame and add a category spam and ham. It is very efficient to add categorical column to use Naive Bayes model.  This stage we have encounter a series of problems due to many Naive Bayes packages out there that is requires the data to be in a specific way. this was the part that i spent more  than 6 hours figure out how put the corpus in the format. I have enough GPU power to run this  
+
+
+
+
+
+```{r, warning=FALSE}
+# model development 
+# adding text and email columns to the data set 
+df_ham <- as.data.frame(unlist(easy_ham_corpus), stringsAsFactors = FALSE)
+df_ham$type <- "ham"
+colnames(df_ham)=c("text", "email")
+
+
+df_spam <- as.data.frame(unlist(spam_corpus), stringsAsFactors = FALSE)
+df_spam$type <- "spam"
+colnames(df_spam)=c("text", "email")
+
+df_ham_or_spam <- rbind(df_ham, df_spam)
+
+head(df_ham_or_spam)
+
+
+# Split data 
+set.seed(250)
+df_ham_or_spam$text[df_ham_or_spam$text==""] <- "NaN"
+train_index <- createDataPartition(df_ham_or_spam$email, p=0.80, list=FALSE)
+email_train <- df_ham_or_spam[train_index,]
+email_test <- df_ham_or_spam[-train_index,]
+
+
+#Create corpus for training and test data
+train_email_corpus <- Corpus(VectorSource(email_train$text))
+test_email_corpus <- Corpus(VectorSource(email_test$text))
+
+train_clean_corpus <- tm_map(train_email_corpus ,removeNumbers)
+test_clean_corpus <- tm_map(test_email_corpus,removeNumbers)
+
+train_clean_corpus <- tm_map(train_clean_corpus,removePunctuation)
+test_clean_corpus <- tm_map(test_clean_corpus,removePunctuation)
+
+train_clean_corpus <- tm_map(train_clean_corpus,removeWords,stopwords())
+test_clean_corpus  <- tm_map(test_clean_corpus,removeWords, stopwords())
+
+train_clean_corpus<- tm_map(train_clean_corpus,stripWhitespace)
+test_clean_corpus<- tm_map(test_clean_corpus,stripWhitespace)
+
+train_email_dtm <- DocumentTermMatrix(train_clean_corpus)
+test_email_dtm <- DocumentTermMatrix(test_clean_corpus )
+
+```
+
+
+
+
+After Creating the training and testing set, we are going to add o and 1 to both of the sets and create the model. Training set contains 80% of the combines ham and spam and the rest goes to test set. 
+
+
+```{r,warning=F}
+# Here I'm defining input variables 0 and 1 from string to integer
+convert_count <- function(x) {
+  y <- ifelse(x > 0, 1,0)
+  y <- factor(y, levels=c(0,1), labels=c(0,1))
+  y
+}
+
+
+train_sms <- apply(train_email_dtm, 2, convert_count)
+test_sms <- apply(test_email_dtm, 2, convert_count)
+
+
+# NaiveBayes Model:
+classifier <- naiveBayes(train_sms, factor(email_train$email))
+test_pred <- predict(classifier, newdata=test_sms)
+
+cm <- table(test_pred, email_test$email)
+summary(classifier)
+
+confusionMatrix(cm)
+```
+
+Our model achieved accuracy of 0.99 with a p value equal 1. With Sensitivity and balanced accuracy around 0.99, the build is good. We were able to classified 509  as ham and 1 ham as spam, 1 spam as ham and 99 spam as spam. 
+
+## Conclusion
+we are able to use classified ham and spam loaded from `(https://spamassassin.apache.org/old/publiccorpus/)`. Our most significant challenge were the equipment we used. we need more GPU power to run the Naive Bayes model. This is was a very good assignment. It is added significant knowledge on how to do classification problem. We can agree that 99% of spam emails has been corectly classified. 
+
+
+## References
+
+1. GeeksforGeeks. (2021, July 13). Naive Bayes classifier in R programming. GeeksforGeeks. https://www.geeksforgeeks.org/naive-bayes-classifier-in-r-programming/ 
+
+2. Kasper Welbers, Wouter Van Atteveldt &amp; Kenneth Benoit Text Analysis in R. (n.d.). https://eprints.lse.ac.uk/86659/1/Benoit_Text%20analysis%20in%20R_2018.pdf 
+
+3. Public Corpus
+https://spamassassin.apache.org/old/publiccorpus/
+

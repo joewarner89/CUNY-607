@@ -1,0 +1,54 @@
+---
+title: "Recommender System"
+author: "Warner Alexis"
+date: "2023-12-01"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Week 11 Assignment
+
+## Your task is to analyze an existing recommender system that you find interesting.  
+
+You should:
+1. Perform a Scenario Design analysis as described below.  Consider whether it makes sense for your selected recommender 
+system to perform scenario design twice, once for the organization (e.g. Amazon.com) and once for the organization's customers.
+
+2. Attempt to reverse engineer what you can about the site, from the site interface and any available information that you 
+can find on the Internet or elsewhere.
+
+3. Include specific recommendations about how to improve the site's recommendation capabilities going forward. 
+
+4. Create your report using an R Markdown file, and create a discussion thread with a link to the GitHub 
+repo where your Markdown file notebook resides.  You are not expected to need to write code for this discussion assignment.
+
+
+## Amazon Product Recommendations
+Amazon uses collaborative filtering to show product recommendations online. Collaborative Filtering is a recommender system that filter out itmes on the basis of reactions by simular users. we can think of most commmon products user usually bought together  when they are buying a specific item. 
+Amazons's algorithm determine which items are bought more often with other products and recommend these items to the right user to buy. Amazon consider product based on ratings and on users behaviors and preferences. Amazon recommender system consist of Collaborative Filtering, User-based Collaborative Filtering and Item-Based Collaborative  Filtering and Content-Based Filtering
+
+### Collaborarive Filtering
+Amazon uses the customer's purchase history, behavior, preferences and ratings. This will allow amazon to share other costumer similar interest
+
+### User-based Collaborative Filtering
+This technique is used to identify users with similar interest based on their history. 
+For example, Amazon will post people who bought this product usually bought this list of products. 
+
+### Item-Based Collaborative Filtering
+This technique identifies similarities between items based on who purchased them.
+For example, if you are looking at a product on Amazon, they will recommend other product to buy within the same categories. 
+
+### Cotent-Based Filtering 
+This technique analyzes the characteristics of the products, such as their titles, descriptions, categories, and attributes. 
+
+## Algorithmic Improvements
+
+I would remove User-Based recommendation that focus of customer rating because bad ratings can lead to poor recommendations and increase the accuracy of all recommender system techniques used in the system.  I would create a feedback feature to capture what recommendations the customer really want. 
+
+## Conclusion 
+Some of the things that I bought of Amazon came from recommendation by the system. Collaborative filtering is the most common used techniques used by Amazon. The algorithm predicts a given customer's preference on the basis of other customers. As  I recall earlier, Amazon plan need to continue to improve the accuracy of this model focusing on item that bought. 

@@ -1,0 +1,174 @@
+---
+title: "Tidyverse Extended Assignment"
+author: "Warner Alexis"
+date: "2023-11-12"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##1.    Loading the Tidyverse packages and the data into R:
+This is Souleymane Doumbia Assignment 
+```{r packages and data}
+library(tidyverse)
+library(dplyr)
+library(readr)
+
+spotify_data <- read_csv("https://raw.githubusercontent.com/Doumgit/Sentiment-Analysis-Project/main/spotify_songs.csv")
+head(spotify_data)
+```
+
+
+
+##2.    Data Manipulation:
+
+The 'dplyr' package is a powerful tool for data transformation and summarization within the Tidyverse collection. It allows for clear and concise data manipulation, enabling a variety of operations such as filtering rows, selecting specific columns, mutating the dataset to include new variables, summarizing data, and arranging rows based on certain criteria. For example:
+
+```{r Example 1}
+track_pop_above_60 <- spotify_data %>% 
+  filter(track_popularity > 60) %>%
+  select(track_name, track_artist, danceability, energy, tempo)
+head(track_pop_above_60)
+```
+In the example above, we demonstrated how to use `dplyr` to refine the spotify_data dataset to focus on tracks with a popularity greater than 60. We achieve this by employing the `filter()` function. Subsequently, we pare down the dataset to include only relevant columns that we are interested in analyzing: track name, artist, danceability, energy, and tempo by using the `select()` function. This streamlined dataset is then outputted, with `head()` used to display just the first few entries for a quick preview of the transformed data.
+
+
+
+##3.    Data Visualization:
+
+With `dplyr` and `ggplot2` together, you can create a variety of visualizations. For instance, a scatter plot to see the relationship between 'danceability' and 'energy' could be made like so:
+
+
+```{r Example 2}
+# Data manipulation with dplyr: let's categorize tracks as 'High popularity' or 'Low popularity'
+# assuming the median of the 'track_popularity' can be a good threshold
+spotify_data_mutated <- spotify_data %>%
+  mutate(popularity_category = if_else(track_popularity > median(track_popularity, na.rm = TRUE), 
+                                       "High Popularity", 
+                                       "Low Popularity"))
+
+# For a large dataset like spotify_data, you might want to take a sample to make plotting faster
+sampled_data <- sample_n(spotify_data_mutated, 1000)
+
+ggplot(sampled_data, aes(x = danceability, y = energy, color = popularity_category)) +
+  geom_point(alpha = 0.7) +   
+  facet_wrap(~popularity_category) +   
+  labs(title = "Danceability vs Energy by Popularity Category",
+       x = "Danceability", 
+       y = "Energy",
+       color = "Popularity Category") +
+  theme_minimal()   
+
+# Saving the plot as png
+ggsave("Danceability_vs_Energy_by_Popularity_Category.png", width = 10, height = 8)
+
+```
+In this vignette, we leverage the capabilities of the Tidyverse, specifically `dplyr` for data manipulation and `ggplot2` for data visualization. First, we use `dplyr` to enhance our dataset by creating a new column that categorizes tracks based on their popularity. This categorization allows us to explore nuances in the data, such as differences in danceability and energy between tracks with high and low popularity. Due to the potential size of the dataset, we use `dplyr` to sample the data, making our subsequent visualization more efficient and manageable.
+
+Once our data is prepared, we transition to visualizing it with `ggplot2`. We construct a scatter plot that illustrates the relationship between `danceability` and `energy`, utilizing the newly created popularity categories to color-code the points. This not only adds a layer of information to our plot but also enhances readability. To further refine our visualization, we employ `facet_wrap` to generate separate plots for each popularity category, providing a clearer comparison between the groups. Finally, we add appropriate labels and titles for context and clarity and save the resulting plot as a PNG file. This process from data manipulation to visualization exemplifies a seamless workflow within the Tidyverse ecosystem, yielding insightful and aesthetically pleasing representations of our data.
+
+
+
+##4.    Data Summarization:
+
+Summarization is a crucial step in data analysis, allowing us to extract meaningful statistics from larger datasets. The `dplyr` package simplifies this process by providing intuitive functions such as `group_by()` and `summarize()`. For example, to calculate the average `loudness` by `playlist_genre`:
+
+```{r Example 3}
+summarising_data <- spotify_data %>%
+  group_by(playlist_genre) %>%
+  summarize(avg_loudness = mean(loudness, na.rm = TRUE))
+summarising_data
+```
+In the example above, we use these functions to calculate the average 'loudness' for each 'playlist_genre' within the 'spotify_data' dataset. The 'group_by()' function clusters the data by each unique genre, setting the stage for the calculation of summary statistics within each group. Then, 'summarize()' is applied to compute the mean 'loudness' across these groups, while 'na.rm = TRUE' ensures that missing values do not affect the calculation.
+The resulting object, 'summarising_data', contains the average loudness values neatly organized by genre, providing an immediate snapshot of this particular attribute across different genres.
+
+* * *
+
+
+
+## Extended Tidyverse Assignment 
+
+Spotify data set has a lot information about songs, albums and artists. Our analysis is to find relevant information about the data set. 
+We are going to read the data from Github and omit all **NA** values. It is important that we create new variables. 
+We create a subset of the data taking every songs and albums released in 2001 to the most recent date. 
+
+```{r}
+spotify_data <- read_csv("https://raw.githubusercontent.com/Doumgit/Sentiment-Analysis-Project/main/spotify_songs.csv")
+spotify_data <- na.omit(spotify_data)
+head(spotify_data)
+# Create Yearly version of realease date
+spotify_data$track_album_release_date <-    as.Date(spotify_data$track_album_release_date)
+spotify_data$album_release_year <-   format(spotify_data$track_album_release_date,format = "%Y")
+
+
+
+# Createa a subset of this data set 
+# spotify 
+album_data <- spotify_data %>% arrange(desc(duration_ms)) %>%
+  select(track_album_name,track_name,track_artist,speechiness,loudness,tempo, danceability,speechiness ,duration_ms,album_release_year) %>%
+  filter( album_release_year >= 2001 & album_release_year <= 2023)
+head(album_data)
+```
+
+With the subset created, we are going to retrieve all the 10 top songs with actual words spoken on them. This is how Spotify describes their feature metadata: 
+
+1- Speechiness: “Speechiness detects the presence of spoken words in a track”. If the speechiness of a song is above 0.66, it is probably made of spoken words, a score between 0.33 and 0.66 is a song that may contain both music and words, and a score below 0.33 means the song does not have any speech.
+
+2- Energy: “(energy) represents a perceptual measure of intensity and activity. Typically, energetic tracks feel fast, loud, and noisy”.
+
+3- Danceability: “Danceability describes how suitable a track is for dancing based on a combination of musical elements including tempo, rhythm stability, beat strength, and overall regularity. A value of 0.0 is least danceable and 1.0 is most danceable”.
+
+4- Valence: “A measure from 0.0 to 1.0 describing the musical positiveness conveyed by a track. Tracks with high valence sound more positive (e.g. happy, cheerful, euphoric), while tracks with low valence sound more negative (e.g. sad, depressed, angry)”.
+
+5 - Beats Per Minute (BPM) - The tempo of the song.
+
+```{r}
+spotify_data %>% head(10)  %>% arrange(desc(speechiness)) %>% select(track_artist, speechiness) %>% 
+  ggplot(t, mapping = aes(x=track_artist, y=speechiness, fill=speechiness))+ 
+  geom_bar(position = "dodge", stat="identity")+
+  scale_fill_gradient(low = "grey20", high = "springgreen3")+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+```
+
+
+we have revealed the top 10 artists with the highest rate of  spoken words in Spottily data set. There were a lot of good songs in 2019 and profound lyrics. Ed Sheeran, Katy Perry, Maroon 5 were incredible. Now lets look about songs that have the highest tempo since 2001. 
+
+```{r}
+
+album_data %>% select(track_name,track_artist,tempo) %>% 
+  arrange(desc(tempo)) %>% head(10) %>% 
+  ggplot( mapping = aes(x=track_name, y=tempo, fill=tempo))+ 
+  geom_bar(position = "dodge", stat="identity")+
+  scale_fill_gradient(low = "grey20", high = "springgreen3")+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+labs(height=10, width=5)+
+  geom_text(aes(label = track_artist),color="white",hjust= 1.5, vjust = 0, size = 3, angle = 90, position = position_dodge(width = 1))
+```
+
+The top artists with the highest number of releases since 2001. 
+
+
+```{r}
+# artists with most releases
+album_data %>% group_by(Artist = track_artist) %>%
+  summarise(No_of_tracks = n()) %>%
+  arrange(desc(No_of_tracks)) %>%
+  top_n(15, wt = No_of_tracks) %>% 
+  ggplot(aes(x = Artist, y = No_of_tracks, fill = No_of_tracks)) +
+  geom_bar(position = "dodge", stat="identity")+
+  scale_fill_gradient(low = "blue2", high = "springgreen3")+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+labs(height=10, width=5)+
+  coord_flip() + labs(title = "artists with the most releases", x = "artists", y = "no of releases")
+
+```
+
+
+
+## Conclusion
+There are still a lot information to retrieve from the data set. we seen the top artists who made songs with the highest tempo and had profound lyrics on their songs. from 2001 to now, there have been few artist that released a lot of songs but, Martin Garrix and the Chainsmokers have released more songs since 2001 than any other artists or bands. 

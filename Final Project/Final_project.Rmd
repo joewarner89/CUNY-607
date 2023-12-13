@@ -1,0 +1,380 @@
+---
+title: "Data 607 Final Project"
+author: "Warner Alexis"
+date: "2023-12-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+## Hospital Readmission Reduction
+
+The center for Medicare and Medicaid Services begun to reduce payment to Hospitals for excessive readmissions on October 1rst 2012 as part of the Affordable Care Act. Hospitals’ mission switches strategies to reduce rehospitalization rate and improves quality care so patients don’t come back within 30 days readmission. There are several strategies implemented to enable the process but, the use of data analytics has been indispensable to reduction of readmission rate. Warchol et al. said: “Data analytics can be used to improve clinical operations, watch for care patterns, and identify readmission risk.” He acknowledges that other researcher like Monga suggested that hospitals have the ability to design an analytical model to predict the likelihood of patients’ readmission on the basis of information collected in Electronic Health Records (EHR). The purpose of this project is to predict the hospital readmission from this data set in UC Irvine Machine Learning Repository called “Diabetes 130-US hospitals for years 1999-2008”. 
+
+This data set contains information about care given to patients in 130 Hospitals from 1990- 2008. It has 50 columns representing patients and hospital outcomes.
+
+Data Source:
+https://archive.ics.uci.edu/dataset/296/diabetes+130-us+hospitals+for+years+1999-2008
+
+
+Readmission is considered when patient return to hospital 30 days after his first admission. 
+
+── Data Summary ────────────────────────
+                           Values  
+Name                       diabetic
+Number of rows             101766  
+Number of columns          52 
+
+
+```{r cars}
+library(tidyverse)
+library(ggplot2)
+library(skimr)
+library(htmlTable)
+library(glmnet)
+library(caret)
+
+#library(DMwR)
+library(corrplot)
+# Load teh data set 
+# read the hospital data 
+diabetic <- read.csv("diabetic_data.csv", stringsAsFactors = F)
+data_info <- read.csv("IDS_mapping.csv", stringsAsFactors = F)
+
+# Let map some column 
+admin <- data_info %>% select(1,2) %>% stats::na.omit()
+disch <- data_info %>% select(3,4) %>% na.omit()
+admin_sc <- data_info %>% select(5,6) %>% na.omit()
+
+# Remapping the column name with id 
+
+diabetic <- diabetic %>% inner_join(admin,by =  "admission_type_id") %>% 
+  inner_join(disch,by = "discharge_disposition_id") %>% 
+  inner_join(admin_sc,by = "admission_source_id") %>% 
+  select(1:5,7,admission_type_name,discharge_disposition_id,discharge_disposition_name
+        ,admission_source_id,admission_source_name,9:51)
+
+skim(diabetic)
+
+```
+
+## Understanding the data set
+
+According the UC Irvine, The dataset represents ten years (1999-2008) of clinical care at 130 US hospitals and integrated delivery networks. It includes over 50 features representing patient and hospital outcomes. Information was extracted from the database for encounters that satisfied the following criteria.
+(1)	It is an inpatient encounter (a hospital admission).
+(2)	It is a diabetic encounter, that is, one during which any kind of diabetes was entered into the system as a diagnosis.
+(3)	The length of stay was at least 1 day and at most 14 days.
+(4)	Laboratory tests were performed during the encounter.
+(5)	Medications were administered during the encounter.
+
+There is a lot of categorical values that are significant to a hospital encounter and readmission in this data set. I need to remove any undocumented observations and mark them NA so later on it doesn't affect the classification model. 
+
+
+
+
+```{r pressure, echo=FALSE}
+# Revealing all important information about the data set
+
+# Fixing label name 
+diabetic$race[diabetic$race == "AfricanAmerican"] <- "African American"
+# #count the missing value with mark"?" and "Unknown/Invalid"
+# Replacing ? with NA 
+diabetic[diabetic == '?'] <- NA
+# see the number of na 
+sapply(diabetic, function(x) sum(is.na(x)))
+# check if value actually contain null 
+sapply(diabetic, function(x) sum(is.null(x))) # data came from different systems
+diabetic[diabetic == "NULL" ] <- NA
+
+diabetic <- na.omit(diabetic)
+
+# see how dimension of the tabe change 
+dim(diabetic)
+
+
+```
+
+
+
+According to our summary, some data columns have only unique categorical value. Single value columns need to be removed in the data set. 
+
+
+
+```{r}
+diabetic %>% select(citoglipton,examide,troglitazone,glimepiride.pioglitazone,
+                    metformin.rosiglitazone,acetohexamide,tolbutamide) %>%
+  distinct()
+
+#remove columns 
+diabetic$citoglipton <- NULL
+diabetic$examide <- NULL
+diabetic$troglitazone <- NULL 
+diabetic$glimepiride.pioglitazone <- NULL 
+diabetic$acetohexamide <- NULL 
+diabetic$metformin.rosiglitazone <- NULL
+diabetic$tolbutamide <- NULL
+
+dim(diabetic)
+#### Number of encounter type by Admission name 
+diabetic %>%  group_by(admission_type_name) %>% summarise(count = n()) %>% group_by(admission_type_name) %>%
+  
+  ggplot( mapping = aes(x=admission_type_name, y=count, fill=count))+ 
+  geom_bar(position = "dodge", stat="identity")+
+  scale_fill_gradient(low = "grey20", high = "springgreen3")+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+labs(height=10, width=5)+
+  geom_text(aes(label = admission_type_name),color="white",hjust= 1.5, vjust = 0, size = 3, angle = 90, position = position_dodge(width = 1)) + labs(title = "Number of Hospital encounter type by Admission name", x = "Admission Type Name", y = "No of Encounters")
+# number of encounters by 
+diabetic  %>% group_by(specialty = medical_specialty) %>%
+  summarise(No_of_encounter = n()) %>%
+  arrange(desc(No_of_encounter)) %>%
+  top_n(15, wt = No_of_encounter) %>% 
+  ggplot(aes(x = specialty, y = No_of_encounter, fill = No_of_encounter)) +
+  geom_bar(position = "dodge", stat="identity")+
+  scale_fill_gradient(low = "blue2", high = "springgreen3")+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+labs(height=10, width=5)+
+  coord_flip() + labs(title = "Number of Hospital encounter Types by Specialty", x = "Hospital Specialty", y = "no of Encounters")
+
+# remove the icd 9 code to reveal more inormation 
+  
+diabetic$diag_1 <- str_replace_all(diabetic$diag_1, "[[:punct:]]", "")
+diabetic$diag_2 <- str_replace_all(diabetic$diag_2, "[[:punct:]]", "")
+diabetic$diag_3 <- str_replace_all(diabetic$diag_3, "[[:punct:]]", "")
+
+# read the icd 9 code from 
+icd_9 <- read.delim("https://raw.githubusercontent.com/joewarner89/CUNY-607/main/Final%20Project/icd9.txt",stringsAsFactors = F) %>% rename(diag_1 = 1,Short_desc = 3)
+
+  
+```
+
+
+The risk of developing pneumonia increase with diabetes. According to healthline.com, diabetes weaken your immune system. In our data set, we have 908 Hospital visits that result in a claim for pneumonia and about 185 for population ages 18 years and older that was diagnosed with uncontrolled diabetes. We may have more patients that fits these diagnosis.
+
+The data do not contain any diagnosis name and group name. We download the ICD 9 code from CMS data and major name was collected in this link https://juniperpublishers.com/ctbeb/CTBEB.MS.ID.555715.php
+
+
+The next step is to create diagnosis category to capture all major events. see picture below: 
+
+
+![Main Group Name for ICD 9](C:\Users\Warner_Beast\OneDrive\Documents\CUNY\DATA 607 - Data Acquisition and Management\Final Project\Screenshot.png)
+
+
+
+
+
+
+```{r,warning=FALSE}
+# look at the main diagnosis for 
+
+diabetic   %>%
+  inner_join(icd_9,by="diag_1")  %>% select(encounter_id,diag_1,Short_desc) %>% 
+  group_by(Short_desc) %>%  summarize(No_of_encounter = n()) %>% 
+  arrange(desc(No_of_encounter)) %>%
+  top_n(15, wt = No_of_encounter) %>%
+  ggplot(aes(x = Short_desc, y = No_of_encounter, fill = No_of_encounter)) +
+  geom_bar(position = "dodge", stat="identity")+
+  scale_fill_gradient(low = "blue2", high = "springgreen3")+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+labs(height=10, width=5)+
+  coord_flip() + labs(title = "Number of Hospital Diagnosis by ICD 9", x = "ICD 9 Name", y = "no of Encounters")
+
+
+# Diabetes Poor controls
+diag_cate <- c("2511", "2512", "24901", "24930", "24931", "24941", "24951"," 24961", '24971', "24981", "24991", "25002", "25003", "25030", "25031",
+               "25032", "25033", "25042", "25043,", "25052", "25053", "25062", "25063", "25072", "25073", "25082", "25083", "25092", "25093")
+
+# Create diagnosis table 
+data <- mutate(diabetic, diagnosis =
+         ifelse(str_detect(diag_1, "V") | str_detect(diag_1, "E"),"Other", 
+                # disease codes starting with V or E are in “other” category;
+                ifelse(str_detect(diag_1, "250"), "Diabetes",
+                       ifelse((as.integer(diag_1) %in% diag_cate & as.integer(diag_1) <= 459) | as.integer(diag_1) == 785, "Circulatory",
+                              ifelse((as.integer(diag_1) >= 460 & as.integer(diag_1) <= 519) | as.integer(diag_1) == 786, "Respiratory", 
+                                     ifelse((as.integer(diag_1) >= 520 & as.integer(diag_1) <= 579) | as.integer(diag_1) == 787, "Digestive", 
+                                            ifelse((as.integer(diag_1) >= 580 & as.integer(diag_1) <= 629) | as.integer(diag_1) == 788, "Genitourinary",
+                                                   ifelse((as.integer(diag_1) >= 140 & as.integer(diag_1) <= 239), "Neoplasms",  
+                                                          ifelse((as.integer(diag_1) >= 710 & as.integer(diag_1) <= 739), "Musculoskeletal",          
+                                                                 ifelse((as.integer(diag_1) >= 800 & as.integer(diag_1) <= 999), "Injury",                    
+                                                                        "Circulatory"))))))))))
+
+
+# Group Name by encounter count
+
+data %>%  group_by(diagnosis,race) %>% summarise(count = n()) %>% group_by(diagnosis) %>%
+  ggplot(aes(x =diagnosis, y = count, fill = race)) +
+  geom_col() +
+   labs(title = "Number of Hospital encounter Types by Diagnosis Group", x = "Group Name", y = "no of Encounters")
+
+# Number of men and women affected by diabetes 
+data %>%  group_by(race,gender) %>% summarise(count = n()) %>%  arrange(desc(count)) %>%
+  ggplot(aes(x =race, y = count, fill = gender)) +
+  geom_col() +
+  labs(title = "Number of Hospital encounter Types by Gender and Race", x = "Group Name", y = "no of Encounters")
+
+# gender stats 
+
+gender_stat <- data %>%  group_by(race,gender) %>% summarise(count = n()) %>%  arrange(desc(count))
+htmlTable(gender_stat)
+```
+
+
+
+Diabetes mellitus or diabetes disproportionately affects minority populations. Most patients who poor control over their diabetes treatment face circulatory issues. In the data set, both caucasian and African american have the high number of circulatory diagnosis. There are more women caucasian that are diagnosed with diabetes more than every ethnic group. 
+
+
+## Multivariate  and Univariate Analysis
+We modify the input of some the features to scale the data set. I make change to some categorical values. This data set has more than 15 categorical values. It is very useful to understand the impact of each variables in real life. Medication play a big part of treatments for Diabetes. Some of the features present a challenge due to the way they were created. Variables with low variances are not reliable for statistical modeling. 
+
+We combine all the low variance columns to add more variances to the data and preserve the information. Based on the initial graph we did, we need to remove outliers. 
+
+
+
+
+```{r}
+# reassign data set 
+lib <- data 
+
+## Removing duplicate patients encounter
+lib <- lib[!duplicated(lib$patient_nbr),]
+
+# Change some categorical data to numerical
+# recategorize the column age
+lib$age <- ifelse(lib$age == "[0-10)",  0, lib$age);
+lib$age <- ifelse(lib$age == "[10-20)", 10, lib$age);
+lib$age <- ifelse(lib$age == "[20-30)", 20, lib$age);
+lib$age <- ifelse(lib$age == "[30-40)", 30, lib$age);
+lib$age <- ifelse(lib$age == "[40-50)", 40, lib$age);
+lib$age <- ifelse(lib$age == "[50-60)", 50, lib$age);
+lib$age <- ifelse(lib$age == "[60-70)", 60, lib$age);
+lib$age <- ifelse(lib$age == "[70-80)", 70, lib$age);
+lib$age <- ifelse(lib$age == "[80-90)", 80, lib$age);
+lib$age <- ifelse(lib$age == "[90-100)", 90, lib$age);
+
+# Change categorical values 
+lib$max_glu_serum <- ifelse(lib$max_glu_serum == "None",  0, lib$max_glu_serum);
+lib$max_glu_serum <- ifelse(lib$max_glu_serum == "Norm",  100, lib$max_glu_serum);
+lib$max_glu_serum <- ifelse(lib$max_glu_serum == ">200",  200, lib$max_glu_serum);
+lib$max_glu_serum <- ifelse(lib$max_glu_serum == ">300",  300, lib$max_glu_serum);
+
+lib$A1Cresult <- ifelse(lib$A1Cresult == "None",  0, lib$A1Cresult);
+lib$A1Cresult <- ifelse(lib$A1Cresult == "Norm",  5, lib$A1Cresult);
+lib$A1Cresult <- ifelse(lib$A1Cresult == ">7",    7, lib$A1Cresult);
+lib$A1Cresult <- ifelse(lib$A1Cresult == ">8",    8, lib$A1Cresult);
+
+lib$metformin <- ifelse(lib$metformin == 'No', 0 , lib$metformin);
+lib$metformin <- ifelse(lib$metformin == 'Steady', 1 , lib$metformin);
+lib$metformin <- ifelse(lib$metformin == 'Up', 2 , lib$metformin);
+lib$metformin <- ifelse(lib$metformin == 'Down', 3 , lib$metformin);
+
+lib$repaglinide <- ifelse(lib$repaglinide == 'No', 0 , lib$repaglinide);
+lib$repaglinide <- ifelse(lib$repaglinide == 'Steady', 1 , lib$repaglinide);
+lib$repaglinide <- ifelse(lib$repaglinide == 'Up', 2 , lib$repaglinide);
+lib$repaglinide <- ifelse(lib$repaglinide == 'Down', 3 , lib$repaglinide);
+
+lib$chlorpropamide <- ifelse(lib$chlorpropamide == 'No', 0 , lib$chlorpropamide);
+lib$chlorpropamide <- ifelse(lib$chlorpropamide == 'Steady', 1 , lib$chlorpropamide);
+lib$chlorpropamide <- ifelse(lib$chlorpropamide == 'Up', 2 , lib$chlorpropamide);
+lib$chlorpropamide <- ifelse(lib$chlorpropamide == 'Down', 3 , lib$chlorpropamide);
+
+lib$nateglinide <- ifelse(lib$nateglinide == 'No', 0 , lib$nateglinide);
+lib$nateglinide <- ifelse(lib$nateglinide == 'Steady', 1 , lib$nateglinide);
+
+lib$glimepiride <- ifelse(lib$glimepiride == 'No', 0 , lib$glimepiride);
+lib$glimepiride <- ifelse(lib$glimepiride == 'Steady', 1 , lib$glimepiride);
+lib$glimepiride <- ifelse(lib$glimepiride == 'Up', 2 , lib$glimepiride);
+
+lib$pioglitazone <- ifelse(lib$pioglitazone == 'No', 0 , lib$pioglitazone);
+lib$pioglitazone <- ifelse(lib$pioglitazone == 'Steady', 1 , lib$pioglitazone);
+lib$pioglitazone <- ifelse(lib$pioglitazone == 'Up', 2 , lib$pioglitazone);
+
+lib$glyburide <- ifelse(lib$glyburide == 'No', 0 , lib$glyburide);
+lib$glyburide <- ifelse(lib$glyburide == 'Steady', 1 , lib$glyburide);
+lib$glyburide <- ifelse(lib$glyburide == 'Up', 2 , lib$glyburide);
+lib$glyburide <- ifelse(lib$glyburide == 'Down', 3 , lib$glyburide);
+
+lib$acarbose <- ifelse(lib$acarbose == 'No', 0 , lib$acarbose);
+lib$acarbose <- ifelse(lib$acarbose == 'Steady', 1 , lib$acarbose);
+
+lib$insulin <- ifelse(lib$insulin == 'No', 0 , lib$insulin);
+lib$insulin <- ifelse(lib$insulin == 'Steady', 1 , lib$insulin);
+lib$insulin <- ifelse(lib$insulin == 'Up', 2 , lib$insulin);
+lib$insulin <- ifelse(lib$insulin == 'Down', 3 , lib$insulin);
+
+lib$glipizide.metformin <- ifelse(lib$glipizide.metformin == 'No', 0 , lib$glipizide.metformin);
+lib$glipizide.metformin <- ifelse(lib$glipizide.metformin == 'Steady', 1 , lib$glipizide.metformin);
+
+lib$change <- ifelse(lib$change == 'No', 0 , lib$change);
+lib$change <- ifelse(lib$change == 'Ch', 1 , lib$change);
+
+lib$diabetesMed <- ifelse(lib$diabetesMed == 'No', 0 , lib$diabetesMed);
+lib$diabetesMed <- ifelse(lib$diabetesMed == 'Yes', 1 , lib$diabetesMed);
+#See Variable with low variances 
+nearZeroVar(lib, names = T, freqCut = 19, uniqueCut = 10)
+
+
+# re categorize encounter
+# Encounter is unique for every visit, so we are going create visit column to capture
+# the number of outpatient inpatient and emergency
+
+lib$visits = lib$number_outpatient + lib$number_emergency + lib$number_inp
+readmitted = lib$readmitted
+lib <- subset(lib, select =-c(readmitted))
+lib$readmitted = readmitted
+
+# identify low variance in the data set
+#This column has low variances 
+keys <- nearZeroVar(lib, names = T, freqCut = 19, uniqueCut = 10)
+keys
+
+# Low variance is usefull to identify outliers
+# correlation would be lower if variance is low.
+lib$num_med <- 0
+lib$num_changes <- 0
+for(key in keys){
+  lib$num_med <- ifelse(lib[key] != 0, lib$num_med + 1, lib$num_med)
+  lib$num_changes <- ifelse((lib[key] == 1 | lib[key] == 2 | lib[key] == 3), lib$num_changes + 1, lib$num_changes)
+}
+
+
+
+## Normalize, Remove Outliers, and Standardize Numerical Features
+lib$number_inpatient <- log1p(lib$number_inpatient)
+lib$number_outpatient <- log1p(lib$number_outpatient)
+lib$number_emergency <- log1p(lib$number_emergency)
+
+histogram(lib$number_inpatient)
+histogram(lib$number_outpatient)
+histogram(lib$number_emergency)
+
+
+
+non_outliers = function(x, zs) {
+  temp <- (x - mean(x))/sd(x)
+  return(temp < zs)
+}
+
+
+
+lib <- lib[non_outliers(lib$number_inpatient, 3),]
+lib <- lib[non_outliers(lib$number_outpatient, 3),]
+lib <- lib[non_outliers(lib$number_emergency, 3),]
+lib <- subset(lib, select = -c(number_emergency))
+
+
+
+#Normalise skewed features and removing outliers using z-score
+
+cols <- dplyr::select_if(lib, is.numeric)
+temp <- scale(dplyr::select_if(lib, is.numeric))
+for(col in colnames(cols)){
+  lib[,col] <- temp[,col]
+}
+head(lib)
+
+
+```
+

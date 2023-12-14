@@ -2,7 +2,10 @@
 title: "Data 607 Final Project"
 author: "Warner Alexis"
 date: "2023-12-10"
-output: html_document
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -34,15 +37,15 @@ library(tidyverse)
 library(ggplot2)
 library(skimr)
 library(htmlTable)
-library(glmnet)
+#library(glmnet)
 library(caret)
 
 #library(DMwR)
 library(corrplot)
 # Load teh data set 
 # read the hospital data 
-diabetic <- read.csv("diabetic_data.csv", stringsAsFactors = F)
-data_info <- read.csv("IDS_mapping.csv", stringsAsFactors = F)
+diabetic <- read.csv("https://raw.githubusercontent.com/joewarner89/CUNY-607/main/Final%20Project/diabetic_data.csv", stringsAsFactors = F)
+data_info <- read.csv("https://raw.githubusercontent.com/joewarner89/CUNY-607/main/Final%20Project/IDS_mapping.csv", stringsAsFactors = F)
 
 # Let map some column 
 admin <- data_info %>% select(1,2) %>% stats::na.omit()
@@ -56,7 +59,7 @@ diabetic <- diabetic %>% inner_join(admin,by =  "admission_type_id") %>%
   inner_join(admin_sc,by = "admission_source_id") %>% 
   select(1:5,7,admission_type_name,discharge_disposition_id,discharge_disposition_name
         ,admission_source_id,admission_source_name,9:51)
-
+# get a look on how the data set work
 skim(diabetic)
 
 ```
@@ -373,8 +376,258 @@ temp <- scale(dplyr::select_if(lib, is.numeric))
 for(col in colnames(cols)){
   lib[,col] <- temp[,col]
 }
-head(lib)
+str(lib)
 
 
 ```
+
+
+
+
+
+
+```{r,warning=FALSE}
+# see c
+ # see c
+library(dplyr)
+# see c
+library(GGally)
+
+
+
+ggpairs(lib, columns = c("number_inpatient","num_lab_procedures","number_outpatient","number_diagnoses",
+                         "num_procedures","visits"))
+# Change datatype 
+lib$num_med   <- as.numeric(lib$num_med)
+# Change data type 
+lib$num_changes <- as.numeric(lib$num_changes)
+
+# PLot all the variables 
+
+cor <-  lib %>% dplyr::select(number_outpatient,number_inpatient,visits, num_med, num_changes)
+plot(cor)
+library(psych)
+corPlot(cor)
+
+# Model development 
+
+# Model development 
+
+# set seed 
+set.seed(123)
+# turn row into 2 category 1 for readmitted and 0 not readmitted in the prediod of 30 days
+lib$readmitted <- case_when(lib$readmitted %in% c(">30","NO") ~ "0",
+                              TRUE ~ "1")
+
+# creating  training and test 
+train_indices <- sample(seq_len(nrow(lib)), 0.7* nrow(lib))
+train_data <- lib[train_indices, ]
+test_data <- lib[-train_indices, ]
+
+# Fit the logistic regression 
+model <- glm(readmitted == '1' ~  visits + number_inpatient + number_outpatient  , data = train_data)
+summary(model)   
+
+predicted_probs <- predict(model, newdata = test_data , type = "response")
+
+# Convert probabilities to binary predictions
+predicted_classes <- ifelse(predicted_probs > 0.1, "readmitted", "Not readmitted")
+# Convert probabilities to predicted classes
+##predicted_classes <- ifelse(predicted_probs > 0.5, "<30", ifelse(predicted_probs > 0.25, "NO", ">30"))
+
+
+# Display the confusion matrix
+confusion_matrix <- table(predicted_classes, test_data$readmitted)
+print(confusion_matrix)
+
+# Calculate accuracy
+accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
+print(paste("Accuracy:", accuracy))
+
+#Display the predicted labels
+
+pred_model_1 <- test_data
+pred_model_1$predictor <- predicted_classes
+head(pred_model_1)
+
+#evaluation 
+##3 second model 
+library(boot)
+# Define the logistic regression model
+set.seed(123)
+logistic_model <- glm(readmitted == "1" ~ visits + number_outpatient  , data = lib)
+summary(logistic_model)
+# Perform 10-fold cross-validation
+cv_results <- cv.glm(lib, logistic_model, K = 10)
+
+##print(cv_results)
+
+# Access accuracy
+accuracy2 <- 1 - cv_results$delta[1]
+cat("Accuracy:", accuracy2, "\n")
+
+
+# Predict the probabilities of the positive class ("Wins")
+predicted_probs2 <- predict(logistic_model, newdata = lib, type = "response")
+
+
+# Convert probabilities to binary predictions
+predicted_labels2 <- predicted_classes <- ifelse(predicted_probs2 > 0.1, "readmitted", "Not readmitted")
+
+# Display results
+#print(data.frame(Probabilities = predicted_probs2, Predicted_Labels = predicted_labels2))
+at2 <- data.frame(Probabilities = predicted_probs2, Predicted_Labels = predicted_labels2)
+head(at2)
+# Display the confusion matrix
+confusion_matrix2 <- table(predicted_labels2, lib$readmitted)
+print(confusion_matrix2)
+
+# Display the predicted labels
+#print(predicted_labels2)
+pred_model2 <- lib
+pred_model2$predictor <- predicted_labels2
+head(pred_model2)
+
+
+
+       
+
+```
+### Model Evaluations 
+
+We create a multiple regression model with an accuracy 0.82 with the encoded data set. we split the data into train and test sets. We notice that there are steps we can do improve the model accuracy. We add more predictors to the second model and implement a cross validation of 10 folds. We were able to achieve an accuracy of 0.92. we try to add more categorical features to the multiple regression and use cross validation of 10 folds to improve the model accuracy to 0.802. We use logistic regression to predict the categorical value of readmitted against the most correlated predictors. we achieved an accuracy of 0.627. 
+
+the second model will be selected to predict the readmission data. There are still a lot of work to get done specially in data reprocessing. We manage to achieve a high accuracy but QQ plots for every model show data are not well distributed. 
+
+## Limitation
+
+There are still outliers in the data set even we used standard deviation to be removed. Data collected should contains more relevant columns that related that are related to diabetes. 
+
+
+
+```{r}
+#####################################################
+# create a new model logistic model with other predictors 
+set.seed(123)
+logistic_model2 <-glm(readmitted== "1"  ~ age + visits + number_outpatient + max_glu_serum + insulin + diabetesMed , data = lib)
+summary(logistic_model2)
+# Perform 10-fold cross-validation
+cv_results2 <- cv.glm(lib, logistic_model2, K = 10)
+
+head(cv_results2)
+
+# Access accuracy
+accuracy3 <- 1 - cv_results2$delta[1]
+cat("Accuracy:", accuracy3, "\n")
+
+
+# Predict the probabilities of the positive class ("Wins")
+predicted_probs3 <- predict(logistic_model2, newdata = lib, type = "response")
+
+
+# Convert probabilities to binary predictions
+predicted_labels3 <- ifelse(predicted_probs3 > 0.1, "readmitted", "Not readmitted")
+
+# Display results
+#print(data.frame(Probabilities = predicted_probs3, Predicted_Labels = predicted_labels3))
+at <- data.frame(Probabilities = predicted_probs3, Predicted_Labels = predicted_labels3) %>% arrange(desc(Probabilities))
+head(at)
+# Display the predicted labels
+#print(predicted_labels3)
+pred_model3 <- lib
+pred_model3$predictor <- predicted_labels3
+head(pred_model3)
+
+# Display the confusion matrix
+confusion_matrix3 <- table(predicted_labels3, lib$readmitted)
+#print(confusion_matrix3)
+
+
+# linear regression 
+model22 <- lm(as.numeric(as.factor(readmitted)) ~ visits + number_outpatient , data = train_data)
+summary(model22)
+
+
+
+# Make predictions
+predictions5 <- predict(model22, newdata = test_data)
+
+predicted_probs22 <- predict(model22, newdata = test_data , type = "response")
+
+# Convert probabilities to binary predictions
+predicted_classes22 <- ifelse(predicted_probs22 > 0.1, "Readmitted", "Not readmitted")
+# Calculate RMSE
+rmse <- sqrt(mean((as.numeric(as.factor(train_data$readmitted)) - predictions5)^2))
+
+# Evaluate accuracy (you might want to use a suitable metric for regression, e.g., RMSE)
+accuracy5 <- sqrt(mean((as.numeric(test_data$readmitted) - predictions5)^2))
+accuracy5
+
+
+# Display results
+print(paste("Root Mean Squared Error (RMSE):", round(accuracy5, 3)))
+
+
+# Baseline model: Predict the mean of the response variable
+baseline_predictions <- rep(mean(as.numeric(train_data$readmitted)), nrow(test_data))
+
+# Calculate RMSE for the baseline model
+baseline_rmse <- sqrt(mean((as.numeric(test_data$readmitted) - baseline_predictions)^2))
+
+
+
+# Calculate RMSE for the model
+model5_rmse <- sqrt(mean((as.numeric(test_data$readmitted) - predictions5)^2))
+
+
+
+
+
+test_data2 <- test_data
+# Compare the RMSE of the baseline model and the new model
+print(paste("Baseline RMSE 2:", round(baseline_rmse, 3)))
+print(paste("Model 5 RMSE:", round(model5_rmse, 3)))
+
+# Make predictions on the test set
+test_data2$predicted_readmission <- predict(model22, newdata = test_data2)
+
+head(test_data2)
+test_data_final <- test_data2 %>% arrange(desc(predicted_readmission))
+
+test_data_final$predicted_readmission <- round(test_data_final$predicted_readmission,0)
+
+##test_data_final %>% arrange(predicted_readmission)
+accuracy_table <- data.frame(Mult_regress_1 = round(accuracy,3),
+                             Mult_regress_2 = round(accuracy2,3),
+                             Mult_regress_3 = round(accuracy3,3),
+                             log_regress = round(accuracy5,3),
+                             baseline_rmse_log = round(baseline_rmse,3))
+
+confusion_matrix22 <- table(predicted_classes22, test_data$readmitted)
+print(confusion_matrix22)
+
+htmlTable( accuracy_table)
+
+# Plot the residuals 
+par(mfrow=c(2,2))
+plot(model)
+
+par(mfrow=c(2,2))
+plot(logistic_model)
+
+par(mfrow=c(2,2))
+plot(logistic_model2)
+
+
+par(mfrow=c(2,2))
+plot(model22)
+
+
+```
+
+
+
+## Conclusion
+Reducing readmission Rate today is one of the major goals hospitals have in the USA. Hospitals can create models that can predict readmission on within 30 days of the first visit. The process of the creating a model will require data processing skills and statistics. we were able to predict 2529 readmission from patient that weren't readmitted while predict 314  readmissions. It is important to play with different metrics to improve the model. Data can be changed or reprocessed to a certain need to have a better and optimized model
+
 
